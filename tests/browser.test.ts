@@ -140,7 +140,7 @@ test("clipboard failure reports the failure without claiming success", async ({ 
       value: { writeText: () => Promise.reject(new Error("Clipboard denied")) },
     });
   });
-  await page.getByRole("button", { name: "Copy TON agent wallet address" }).click();
+  await page.getByRole("button", { name: "Copy Ethereum agent wallet address" }).click();
   await expect(page.getByRole("status")).toContainText("Could not copy the demo address");
 });
 
@@ -162,6 +162,20 @@ test("demo interactions make no external requests", async ({ page }) => {
   await page.getByTestId("confirm-top-up").click();
   await page.getByTestId("complete-top-up").click();
   await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByTestId("top-up-wallet").click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await page.getByTestId("review-top-up").click();
+  await page.getByTestId("confirm-top-up").click();
+  await page.getByTestId("complete-top-up").click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  for (const asset of ["ETH", "USDT", "XAUH"]) {
+    await page.getByTestId("withdraw-wallet").click();
+    await page.getByRole("button", { name: asset, exact: true }).click();
+    await page.getByTestId("review-withdrawal").click();
+    await page.getByTestId("confirm-withdrawal").click();
+    await page.getByTestId("complete-withdrawal").click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+  }
   await page.getByTestId("tab-chat").click();
   await page.getByRole("textbox").fill("Test a demo reply");
   await page.getByTestId("send-message").click();
@@ -183,3 +197,64 @@ test("browser preview viewport mismatch does not truncate the full-page app", as
   expect(shell!.height).toBe(900);
   expect(nav!.y + nav!.height).toBe(900);
 });
+
+test("Ethereum connection dialog supports keyboard navigation and dismissal", async ({ page }) => {
+  await page.goto("/?tab=wallets");
+  const trigger = page.getByRole("button", { name: "Connect Ethereum wallet" });
+  await trigger.focus();
+  await trigger.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleName("Connect an external Ethereum wallet");
+  await expect(dialog).toHaveAccessibleDescription(/secure check confirms/);
+  for (let index = 0; index < 8; index++) {
+    await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.press("Space");
+  await page.getByRole("button", { name: "Dismiss dialog" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme} full Ethereum addresses fit transfer dialogs across screen sizes`, async ({
+    page,
+  }) => {
+    await page.goto(`/?tab=wallets&theme=${theme}`);
+    await page.getByTestId("connect-wallet").click();
+    await page.getByTestId("verify-wallet").click();
+    for (const width of [320, 375, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const flow of ["top-up-wallet", "withdraw-wallet", "review-withdrawal", "activity"]) {
+        if (flow === "activity") {
+          await page.getByTestId("tab-activity").click();
+          await page.getByRole("button", { name: /ETH withdrawal completed/ }).click();
+        } else {
+          await page.getByTestId(flow === "review-withdrawal" ? "withdraw-wallet" : flow).click();
+          if (flow === "review-withdrawal") await page.getByTestId("review-withdrawal").click();
+        }
+        const dialog = page.getByRole("dialog");
+        const layout = await dialog.evaluate((element) => ({
+          overflow: element.scrollWidth - element.clientWidth,
+          addresses: Array.from(element.querySelectorAll(".wallet-address"), (address) => ({
+            text: address.textContent,
+            overflow: address.scrollWidth - address.clientWidth,
+            clippedVertically: address.scrollHeight > address.clientHeight,
+          })),
+        }));
+        expect(layout.overflow).toBeLessThanOrEqual(1);
+        expect(layout.addresses.length).toBeGreaterThan(0);
+        for (const address of layout.addresses) {
+          expect(address.text).toMatch(/0x[0-9a-f]{40}/);
+          expect(address.overflow).toBeLessThanOrEqual(1);
+          expect(address.clippedVertically).toBe(false);
+        }
+        await page.keyboard.press("Escape");
+        if (flow === "activity") await page.getByTestId("tab-wallets").click();
+      }
+    }
+  });
+}

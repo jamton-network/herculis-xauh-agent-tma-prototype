@@ -35,15 +35,15 @@ export function Onboarding({
     {
       icon: <CardStackIcon />,
       eyebrow: "Automatic provisioning",
-      title: "One protected wallet on TON",
-      copy: "A protected agent wallet holds USDT for purchases, receives XAUH, and uses TON to pay every withdrawal fee.",
-      details: ["TON Mainnet USDT purchases", "USDT, XAUH, and TON in one agent wallet"],
+      title: "One protected wallet on Ethereum",
+      copy: "A protected agent wallet holds USDT for purchases, receives XAUH, and uses ETH to pay every withdrawal fee.",
+      details: ["Ethereum Mainnet USDT purchases", "USDT, XAUH, and ETH in one agent wallet"],
     },
     {
       icon: <PersonIcon />,
       eyebrow: "Optional external wallet",
       title: "Connect without giving up control",
-      copy: "A verified external wallet can approve USDT or TON top-ups and receive manually confirmed TON, USDT, or XAUH withdrawals. You may skip this step.",
+      copy: "A verified external wallet can approve USDT or ETH top-ups and receive manually confirmed ETH, USDT, or XAUH withdrawals. You may skip this step.",
       details: [
         "A secure check confirms wallet ownership",
         "Connection never exposes keys or moves funds",
@@ -97,7 +97,7 @@ export function Onboarding({
             data-testid="onboarding-connect-wallet"
           >
             {connectedWallet ? <CheckCircledIcon /> : <GlobeIcon />}
-            {connectedWallet ? "External wallet verified" : "Connect TON wallet"}
+            {connectedWallet ? "External wallet verified" : "Connect Ethereum wallet"}
           </button>
         ) : null}
         {step === 3 ? (

@@ -92,35 +92,27 @@ export const withdrawalAssets: Record<
   WithdrawalAsset,
   {
     balance: number;
-    balanceLabel: string;
     defaultAmount: string;
     estimatedFee: number;
-    estimatedFeeLabel: string;
     feeLimit: number;
   }
 > = {
-  TON: {
+  ETH: {
     balance: 0.42,
-    balanceLabel: "0.42 TON",
     defaultAmount: "0.1",
     estimatedFee: 0.006,
-    estimatedFeeLabel: "≈ 0.006 TON",
     feeLimit: 0.016,
   },
   USDT: {
     balance: 825.4,
-    balanceLabel: "825.40 USDT",
     defaultAmount: "250",
     estimatedFee: 0.045,
-    estimatedFeeLabel: "≈ 0.045 TON",
     feeLimit: 0.05625,
   },
   XAUH: {
     balance: 12.3456,
-    balanceLabel: "12.3456 XAUH",
     defaultAmount: "2.5",
     estimatedFee: 0.045,
-    estimatedFeeLabel: "≈ 0.045 TON",
     feeLimit: 0.05625,
   },
 };
@@ -129,7 +121,7 @@ export const activityItems: ActivityItem[] = [
   {
     id: "DEMO-ACTIVITY-001",
     title: "Delivery completed",
-    description: "XAUH delivered to your TON wallet",
+    description: "XAUH delivered to your Ethereum wallet",
     time: "2h ago",
     amount: "8.2958 XAUH",
     kind: "purchase",
@@ -147,7 +139,7 @@ export const activityItems: ActivityItem[] = [
   {
     id: "DEMO-ACTIVITY-003",
     title: "USDT top-up credited",
-    description: "External wallet transfer confirmed on TON",
+    description: "External wallet transfer confirmed on Ethereum",
     time: "08:24",
     amount: "+500 USDT",
     kind: "topup",
@@ -155,17 +147,17 @@ export const activityItems: ActivityItem[] = [
   },
   {
     id: "DEMO-ACTIVITY-004",
-    title: "TON withdrawal completed",
+    title: "ETH withdrawal completed",
     description: "Sent to your verified external wallet",
     time: "Yesterday",
-    amount: "-0.414 TON",
+    amount: `-${formatWithdrawalAmount(withdrawalAssets.ETH.balance - withdrawalAssets.ETH.estimatedFee, "ETH")} ETH`,
     kind: "withdrawal",
     status: "completed",
   },
   {
     id: "DEMO-ACTIVITY-005",
     title: "USDT withdrawal completed",
-    description: "Network fee paid from the agent wallet in TON",
+    description: "Network fee paid from the agent wallet in ETH",
     time: "Yesterday",
     amount: "-250 USDT",
     kind: "withdrawal",
@@ -174,7 +166,7 @@ export const activityItems: ActivityItem[] = [
   {
     id: "DEMO-ACTIVITY-006",
     title: "Delivery pending",
-    description: "TON USDT payment received; XAUH delivery is in progress",
+    description: "Ethereum USDT payment received; XAUH delivery is in progress",
     time: "Yesterday",
     amount: "125 USDT",
     kind: "purchase",
@@ -277,14 +269,14 @@ export const tabs: Array<{
 ];
 
 export function formatWithdrawalAmount(value: number, asset: WithdrawalAsset) {
-  if (asset === "TON") return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+  if (asset === "ETH") return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
   if (asset === "USDT") return value.toFixed(2).replace(/\.00$/, "");
   return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 export const demoWallets = {
-  agent: "DEMO-AGENT-WALLET-001",
-  external: "DEMO-EXTERNAL-WALLET-001",
+  agent: "0x87fd926d185474eaf7f92fcc724b3f193ffdeb66",
+  external: "0x14bede34e52ad32291bde02bf6c7f0e999317a4f",
 } as const;
 
 export const initialMessages = [

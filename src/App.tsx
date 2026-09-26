@@ -63,7 +63,7 @@ export default function App() {
   const [connectedWallet, setConnectedWallet] = useState<ConnectedWalletState>("disconnected");
   const [walletFlow, setWalletFlow] = useState<WalletFlow>(null);
   const [topUpStage, setTopUpStage] = useState<TopUpStage>("amount");
-  const [topUpAsset, setTopUpAsset] = useState<"USDT" | "TON">("USDT");
+  const [topUpAsset, setTopUpAsset] = useState<"USDT" | "ETH">("USDT");
   const [topUpAmount, setTopUpAmount] = useState("500");
   const [withdrawalStage, setWithdrawalStage] = useState<WithdrawalStage>("amount");
   const [withdrawalAsset, setWithdrawalAsset] = useState<WithdrawalAsset>("XAUH");
@@ -90,38 +90,35 @@ export default function App() {
   const withdrawalConfig = withdrawalAssets[withdrawalAsset];
   const withdrawalNumericAmount = Number(withdrawalAmount);
   const maximumFixedWithdrawal =
-    withdrawalAsset === "TON"
-      ? withdrawalConfig.balance - withdrawalConfig.feeLimit
+    withdrawalAsset === "ETH"
+      ? Number(formatWithdrawalAmount(withdrawalConfig.balance - withdrawalConfig.feeLimit, "ETH"))
       : withdrawalConfig.balance;
   const withdrawalAmountInvalid =
     !Number.isFinite(withdrawalNumericAmount) ||
     withdrawalNumericAmount <= 0 ||
     (withdrawalAmountMode === "fixed" && withdrawalNumericAmount > maximumFixedWithdrawal);
-  const withdrawalSendLabel =
-    withdrawalAmountMode === "max" && withdrawalAsset === "TON"
-      ? "Entire TON balance"
-      : `${withdrawalAmount} ${withdrawalAsset}`;
-  const withdrawalReceiveLabel =
-    withdrawalAmountMode === "max" && withdrawalAsset === "TON"
-      ? "≈ 0.414 TON"
-      : `${withdrawalAmount} ${withdrawalAsset}`;
-  const withdrawalCompletionLabel =
-    withdrawalAmountMode === "max" && withdrawalAsset === "TON"
-      ? "0.414 TON"
-      : `${withdrawalAmount} ${withdrawalAsset}`;
+  const isMaxEthWithdrawal = withdrawalAmountMode === "max" && withdrawalAsset === "ETH";
+  const withdrawalReceivedAmount = isMaxEthWithdrawal
+    ? Math.max(0, withdrawalConfig.balance - withdrawalConfig.estimatedFee)
+    : withdrawalNumericAmount;
+  const withdrawalSendLabel = isMaxEthWithdrawal
+    ? "Entire ETH balance"
+    : `${withdrawalAmount} ${withdrawalAsset}`;
+  const withdrawalCompletionLabel = `${isMaxEthWithdrawal ? formatWithdrawalAmount(withdrawalReceivedAmount, "ETH") : withdrawalAmount} ${withdrawalAsset}`;
+  const withdrawalReceiveLabel = `${isMaxEthWithdrawal ? "≈ " : ""}${withdrawalCompletionLabel}`;
+  const withdrawalFeeLabel = `≈ ${formatWithdrawalAmount(withdrawalConfig.estimatedFee, "ETH")} ETH`;
   const withdrawalBalanceAfter = (() => {
-    if (withdrawalAmountMode === "max" && withdrawalAsset === "TON") return "≈ 0 TON";
-    if (withdrawalAsset === "TON") {
+    if (withdrawalAsset === "ETH") {
       const remaining = Math.max(
         0,
-        withdrawalConfig.balance - withdrawalNumericAmount - withdrawalConfig.estimatedFee,
+        withdrawalConfig.balance - withdrawalReceivedAmount - withdrawalConfig.estimatedFee,
       );
-      return `≈ ${formatWithdrawalAmount(remaining, "TON")} TON`;
+      return `≈ ${formatWithdrawalAmount(remaining, "ETH")} ETH`;
     }
 
     const remainingAsset = Math.max(0, withdrawalConfig.balance - withdrawalNumericAmount);
-    const remainingTon = 0.42 - withdrawalConfig.estimatedFee;
-    return `${formatWithdrawalAmount(remainingAsset, withdrawalAsset)} ${withdrawalAsset} · ≈ ${formatWithdrawalAmount(remainingTon, "TON")} TON`;
+    const remainingEth = Math.max(0, withdrawalAssets.ETH.balance - withdrawalConfig.estimatedFee);
+    return `${formatWithdrawalAmount(remainingAsset, withdrawalAsset)} ${withdrawalAsset} · ≈ ${formatWithdrawalAmount(remainingEth, "ETH")} ETH`;
   })();
 
   const selectWithdrawalAsset = (asset: WithdrawalAsset) => {
@@ -408,7 +405,7 @@ export default function App() {
         onOpenChange={(open) => {
           if (!open) setWalletFlow(null);
         }}
-        title="Connect an external TON wallet"
+        title="Connect an external Ethereum wallet"
         description="A secure check confirms that this wallet belongs to you. The agent never receives your keys."
       >
         <div className="wallet-flow">
@@ -417,12 +414,12 @@ export default function App() {
               <ExclamationTriangleIcon />
               <h3>
                 {connectedWallet === "wrong-network"
-                  ? "TON Mainnet required"
+                  ? "Ethereum Mainnet required"
                   : "Wallet check failed"}
               </h3>
               <p>
                 {connectedWallet === "wrong-network"
-                  ? "Switch the wallet to TON Mainnet and try again."
+                  ? "Switch the wallet to Ethereum Mainnet and try again."
                   : "We could not verify this wallet. Start a new connection request."}
               </p>
             </div>
@@ -471,7 +468,7 @@ export default function App() {
           if (!open) setWalletFlow(null);
         }}
         title="Top up agent wallet"
-        description="Your external wallet approves the transfer. Credit appears only after TON confirmation."
+        description="Your external wallet approves the transfer. Credit appears only after Ethereum confirmation."
       >
         <div className="wallet-flow">
           {topUpStage === "amount" ? (
@@ -481,7 +478,7 @@ export default function App() {
                 role="group"
                 aria-label="Top-up asset"
               >
-                {(["USDT", "TON"] as const).map((asset) => (
+                {(["USDT", "ETH"] as const).map((asset) => (
                   <button
                     type="button"
                     key={asset}
@@ -510,23 +507,23 @@ export default function App() {
               <dl className="detail-list detail-list--compact">
                 <div>
                   <dt>From</dt>
-                  <dd>Demo wallet · {demoWallets.external}</dd>
+                  <dd className="wallet-address">Demo wallet · {demoWallets.external}</dd>
                 </div>
                 <div>
                   <dt>To</dt>
-                  <dd>Agent wallet · {demoWallets.agent}</dd>
+                  <dd className="wallet-address">Agent wallet · {demoWallets.agent}</dd>
                 </div>
                 <div>
                   <dt>Network</dt>
-                  <dd>TON Mainnet</dd>
+                  <dd>Ethereum Mainnet</dd>
                 </div>
               </dl>
               <aside className="risk-note">
                 <InfoCircledIcon />
                 <p>
                   {topUpAsset === "USDT"
-                    ? "Your external wallet needs a small TON balance for its transfer fee."
-                    : "TON pays the network fee for manual TON, USDT, and XAUH withdrawals."}
+                    ? "Your external wallet needs a small ETH balance for its transfer fee."
+                    : "ETH pays the network fee for manual ETH, USDT, and XAUH withdrawals."}
                 </p>
               </aside>
               <button
@@ -547,7 +544,7 @@ export default function App() {
                 <h3>
                   Approve {topUpAmount} {topUpAsset}
                 </h3>
-                <p>Confirm the destination, token, amount, and TON Mainnet in your wallet.</p>
+                <p>Confirm the destination, token, amount, and Ethereum Mainnet in your wallet.</p>
               </div>
               <button
                 type="button"
@@ -590,7 +587,7 @@ export default function App() {
                 onClick={() => setTopUpStage("credited")}
                 data-testid="complete-top-up"
               >
-                Simulate TON confirmation
+                Simulate Ethereum confirmation
               </button>
             </>
           ) : topUpStage === "credited" ? (
@@ -642,7 +639,7 @@ export default function App() {
           if (!open) setWalletFlow(null);
         }}
         title="Withdraw"
-        description="Choose TON, USDT, or XAUH. Every withdrawal goes only to your verified external wallet."
+        description="Choose ETH, USDT, or XAUH. Every withdrawal goes only to your verified external wallet."
       >
         <div className="wallet-flow">
           {withdrawalStage === "amount" ? (
@@ -652,7 +649,7 @@ export default function App() {
                 role="group"
                 aria-label="Withdrawal asset"
               >
-                {(["TON", "USDT", "XAUH"] as const).map((asset) => (
+                {(["ETH", "USDT", "XAUH"] as const).map((asset) => (
                   <button
                     type="button"
                     key={asset}
@@ -689,10 +686,10 @@ export default function App() {
                   />
                   <small>{withdrawalAsset}</small>
                 </span>
-                {withdrawalAsset === "TON" && withdrawalAmountMode === "fixed" ? (
+                {withdrawalAsset === "ETH" && withdrawalAmountMode === "fixed" ? (
                   <small className={withdrawalAmountInvalid ? "field-error" : "field-help"}>
-                    Maximum fixed amount: 0.404 TON. Choose Max to send the remaining balance after
-                    fees.
+                    Maximum fixed amount: {formatWithdrawalAmount(maximumFixedWithdrawal, "ETH")}{" "}
+                    ETH. Choose Max to send the remaining balance after fees.
                   </small>
                 ) : withdrawalAmountInvalid ? (
                   <small className="field-error">
@@ -703,20 +700,23 @@ export default function App() {
               <dl className="detail-list detail-list--compact">
                 <div>
                   <dt>Available</dt>
-                  <dd>{withdrawalConfig.balanceLabel}</dd>
+                  <dd>
+                    {formatWithdrawalAmount(withdrawalConfig.balance, withdrawalAsset)}{" "}
+                    {withdrawalAsset}
+                  </dd>
                 </div>
                 <div>
                   <dt>Destination</dt>
-                  <dd>Verified · {demoWallets.external}</dd>
+                  <dd className="wallet-address">Verified · {demoWallets.external}</dd>
                 </div>
                 <div>
                   <dt>Estimated network fee</dt>
-                  <dd>{withdrawalConfig.estimatedFeeLabel}</dd>
+                  <dd>{withdrawalFeeLabel}</dd>
                 </div>
-                {withdrawalAmountMode === "max" && withdrawalAsset === "TON" ? (
+                {isMaxEthWithdrawal ? (
                   <div>
                     <dt>Estimated to receive</dt>
-                    <dd>≈ 0.414 TON</dd>
+                    <dd>{withdrawalReceiveLabel}</dd>
                   </div>
                 ) : null}
                 <div>
@@ -724,19 +724,19 @@ export default function App() {
                   <dd>{withdrawalBalanceAfter}</dd>
                 </div>
               </dl>
-              {withdrawalAmountMode === "max" && withdrawalAsset === "TON" ? (
+              {isMaxEthWithdrawal ? (
                 <aside className="risk-note">
                   <InfoCircledIcon />
                   <p>
-                    Max sends the remaining TON balance after the actual network fee. The agent
-                    wallet may have no TON left for another withdrawal.
+                    Max sends the remaining ETH balance after the actual network fee. The agent
+                    wallet may have no ETH left for another withdrawal.
                   </p>
                 </aside>
               ) : (
                 <aside className="risk-note">
                   <InfoCircledIcon />
                   <p>
-                    The network fee is paid from the agent wallet in TON and does not change the{" "}
+                    The network fee is paid from the agent wallet in ETH and does not change the{" "}
                     {withdrawalAsset} amount you enter.
                   </p>
                 </aside>
@@ -754,9 +754,9 @@ export default function App() {
                 <button
                   type="button"
                   className="text-button"
-                  onClick={() => setWithdrawalStage("insufficient-ton")}
+                  onClick={() => setWithdrawalStage("insufficient-eth")}
                 >
-                  Preview insufficient TON
+                  Preview insufficient ETH
                 </button>
                 <button
                   type="button"
@@ -775,18 +775,18 @@ export default function App() {
                 <span>Estimated to receive</span>
                 <strong>{withdrawalReceiveLabel}</strong>
                 <span>Estimated network fee</span>
-                <strong>{withdrawalConfig.estimatedFeeLabel}</strong>
+                <strong>{withdrawalFeeLabel}</strong>
                 <span>Agent wallet after</span>
                 <strong>{withdrawalBalanceAfter}</strong>
                 <span>To verified wallet</span>
-                <strong>{demoWallets.external}</strong>
+                <strong className="wallet-address">{demoWallets.external}</strong>
               </div>
               <aside className="risk-note">
                 <InfoCircledIcon />
                 <p>
-                  {withdrawalAmountMode === "max" && withdrawalAsset === "TON"
-                    ? "The received TON amount is an estimate because the actual network fee is deducted from the balance. You may need to top up TON before another withdrawal."
-                    : "This transfer is irreversible, its fee is paid from the agent wallet in TON, and it is separate from your trading strategy."}
+                  {isMaxEthWithdrawal
+                    ? "The received ETH amount is an estimate because the actual network fee is deducted from the balance. You may need to top up ETH before another withdrawal."
+                    : "This transfer is irreversible, its fee is paid from the agent wallet in ETH, and it is separate from your trading strategy."}
                 </p>
               </aside>
               <button
@@ -810,7 +810,7 @@ export default function App() {
               <div className="flow-state flow-state--pending">
                 <UpdateIcon />
                 <h3>Withdrawal submitted</h3>
-                <p>Security checks passed. Waiting for the TON transfer result.</p>
+                <p>Security checks passed. Waiting for the Ethereum transfer result.</p>
               </div>
               <button
                 type="button"
@@ -858,26 +858,26 @@ export default function App() {
                 Done
               </button>
             </>
-          ) : withdrawalStage === "insufficient-ton" ? (
+          ) : withdrawalStage === "insufficient-eth" ? (
             <>
               <div className="flow-state flow-state--danger">
                 <ExclamationTriangleIcon />
-                <h3>TON balance is too low</h3>
+                <h3>ETH balance is too low</h3>
                 <p>
-                  The agent wallet must pay the withdrawal fee in TON. Add TON before trying again.
+                  The agent wallet must pay the withdrawal fee in ETH. Add ETH before trying again.
                 </p>
               </div>
               <button
                 type="button"
                 className="button button--primary"
                 onClick={() => {
-                  setTopUpAsset("TON");
+                  setTopUpAsset("ETH");
                   setTopUpAmount("0.5");
                   setTopUpStage("amount");
                   setWalletFlow("topup");
                 }}
               >
-                Top up TON
+                Top up ETH
               </button>
             </>
           ) : withdrawalStage === "stale-preview" ? (

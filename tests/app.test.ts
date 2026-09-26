@@ -61,7 +61,9 @@ async function openWallets(page: Page) {
 
 async function connectWallet(page: Page) {
   await page.getByTestId("connect-wallet").click();
-  await expect(page.getByRole("heading", { name: "Connect an external TON wallet" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Connect an external Ethereum wallet" }),
+  ).toBeVisible();
   await page.getByTestId("verify-wallet").click();
   await expect(page.getByText("Verified", { exact: true })).toBeVisible();
 }
@@ -97,7 +99,9 @@ test("onboarding explains one agent wallet and keeps external-wallet connection 
   await expect(page.getByRole("heading", { name: "One agent across bot and TMA" })).toBeVisible();
 
   await page.getByTestId("onboarding-next").click();
-  await expect(page.getByRole("heading", { name: "One protected wallet on TON" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "One protected wallet on Ethereum" }),
+  ).toBeVisible();
   await expect(page.getByText(/protected agent wallet holds USDT/)).toBeVisible();
 
   await page.getByTestId("onboarding-next").click();
@@ -117,7 +121,10 @@ test("wallet ownership states and a confirmed USDT top-up are interactive", asyn
   await page.getByTestId("connect-wallet").click();
   await expectOpaqueSheet(page);
   await page.getByRole("button", { name: "Preview wrong network" }).click();
-  await expect(page.getByRole("heading", { name: "TON Mainnet required" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ethereum Mainnet required" })).toBeVisible();
+  await expect(
+    page.getByText("Switch the wallet to Ethereum Mainnet and try again."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Preview verification failure" }).click();
   await expect(page.getByRole("heading", { name: "Wallet check failed" })).toBeVisible();
   await page.getByTestId("verify-wallet").click();
@@ -136,19 +143,35 @@ test("wallet ownership states and a confirmed USDT top-up are interactive", asyn
   await expect(page.getByTestId("toast")).toContainText("Top-up credited");
 });
 
-test("TON top-up and rejected signing states do not imply credit", async ({ page }) => {
+test("ETH top-up credits only after confirmation and recovers from rejection or submission failure", async ({
+  page,
+}) => {
   await openWallets(page);
   await connectWallet(page);
   await page.getByTestId("top-up-wallet").click();
-  await page.getByRole("button", { name: "TON", exact: true }).click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
   await expect(page.getByLabel("Top-up amount")).toHaveValue("0.5");
   await page.getByTestId("review-top-up").click();
   await page.getByRole("button", { name: "Preview rejection" }).click();
   await expect(page.getByRole("heading", { name: "Request rejected" })).toBeVisible();
   await expect(page.getByText("No transfer was signed or broadcast.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByText("Ethereum Mainnet", { exact: true })).toBeVisible();
+  await page.getByTestId("review-top-up").click();
+  await page.getByRole("button", { name: "Preview failed submission" }).click();
+  await expect(page.getByRole("heading", { name: "Submission failed" })).toBeVisible();
+  await expect(page.getByText(/No credit was recorded/)).toBeVisible();
+  await page.getByRole("button", { name: "Try again" }).click();
+  await page.getByTestId("review-top-up").click();
+  await page.getByTestId("confirm-top-up").click();
+  await expect(page.getByRole("heading", { name: "Top-up submitted" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Simulate Ethereum confirmation" }).click();
+  await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toBeVisible();
 });
 
-test("XAUH withdrawal requires review, explicit confirmation, and TON finality", async ({
+test("XAUH withdrawal requires review, explicit confirmation, and Ethereum confirmation", async ({
   page,
 }) => {
   await openWallets(page);
@@ -163,7 +186,7 @@ test("XAUH withdrawal requires review, explicit confirmation, and TON finality",
   await page.getByLabel("Withdrawal amount").fill("2.5");
   await page.getByTestId("review-withdrawal").click();
   await expect(page.getByText(/This transfer is irreversible/)).toBeVisible();
-  await expect(page.getByText("≈ 0.045 TON", { exact: true })).toBeVisible();
+  await expect(page.getByText("≈ 0.045 ETH", { exact: true })).toBeVisible();
   await page.getByTestId("confirm-withdrawal").click();
   await expect(page.getByRole("heading", { name: "Withdrawal submitted" })).toBeVisible();
   await page.getByTestId("complete-withdrawal").click();
@@ -171,7 +194,7 @@ test("XAUH withdrawal requires review, explicit confirmation, and TON finality",
   await expect(page.getByText(/2.5 XAUH reached your verified external wallet/)).toBeVisible();
 });
 
-test("USDT max and TON fixed or carry-all withdrawals apply fee-aware limits", async ({ page }) => {
+test("USDT and ETH Max withdrawals apply fee-aware limits", async ({ page }) => {
   await openWallets(page);
   await connectWallet(page);
   await page.getByTestId("withdraw-wallet").click();
@@ -179,23 +202,26 @@ test("USDT max and TON fixed or carry-all withdrawals apply fee-aware limits", a
   await page.getByRole("button", { name: "USDT", exact: true }).click();
   await page.getByTestId("withdrawal-max").click();
   await expect(page.getByLabel("Withdrawal amount")).toHaveValue("825.40");
-  await expect(page.getByText("0 USDT · ≈ 0.375 TON", { exact: true })).toBeVisible();
+  await expect(page.getByText("0 USDT · ≈ 0.375 ETH", { exact: true })).toBeVisible();
   await page.getByTestId("review-withdrawal").click();
   await expect(
     page.getByTestId("bottom-sheet").getByText("825.40 USDT", { exact: true }),
   ).toHaveCount(2);
-  await expect(page.getByText(/fee is paid from the agent wallet in TON/)).toBeVisible();
-  await page.getByRole("button", { name: "Go back" }).click();
-
-  await page.getByRole("button", { name: "TON", exact: true }).click();
+  await expect(page.getByText(/fee is paid from the agent wallet in ETH/)).toBeVisible();
+  await page.getByTestId("confirm-withdrawal").click();
+  await page.getByTestId("complete-withdrawal").click();
+  await expect(page.getByText(/825.40 USDT reached your verified external wallet/)).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByTestId("withdraw-wallet").click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
   await page.getByLabel("Withdrawal amount").fill("0.405");
   await expect(page.getByTestId("review-withdrawal")).toBeDisabled();
-  await expect(page.getByText(/Maximum fixed amount: 0.404 TON/)).toBeVisible();
+  await expect(page.getByText(/Maximum fixed amount: 0.404 ETH/)).toBeVisible();
 
   await page.getByTestId("withdrawal-max").click();
   await expect(page.getByLabel("Withdrawal amount")).toHaveValue("0.42");
-  await expect(page.getByText("≈ 0.414 TON", { exact: true })).toBeVisible();
-  await expect(page.getByText("≈ 0 TON", { exact: true })).toBeVisible();
+  await expect(page.getByText("≈ 0.414 ETH", { exact: true })).toBeVisible();
+  await expect(page.getByText("≈ 0 ETH", { exact: true })).toBeVisible();
   for (const width of [375, 393, 430]) {
     await page.setViewportSize({ width, height: 852 });
     const overflow = await page
@@ -205,10 +231,10 @@ test("USDT max and TON fixed or carry-all withdrawals apply fee-aware limits", a
   }
   await expect(page.getByTestId("withdrawal-max")).toHaveCSS("min-height", "44px");
   await page.getByTestId("review-withdrawal").click();
-  await expect(page.getByText(/may need to top up TON before another withdrawal/)).toBeVisible();
+  await expect(page.getByText(/may need to top up ETH before another withdrawal/)).toBeVisible();
   await page.getByTestId("confirm-withdrawal").click();
   await page.getByTestId("complete-withdrawal").click();
-  await expect(page.getByText(/0.414 TON reached your verified external wallet/)).toBeVisible();
+  await expect(page.getByText(/0.414 ETH reached your verified external wallet/)).toBeVisible();
 });
 
 test("withdrawal fee, stale-preview, failure, and unclear states remain recoverable", async ({
@@ -238,7 +264,7 @@ test("withdrawal fee, stale-preview, failure, and unclear states remain recovera
   await expect(page.getByText(/will not retry/)).toBeVisible();
 });
 
-test("full jetton withdrawal is blocked when the agent wallet cannot pay TON fees", async ({
+test("full token withdrawal is blocked when the agent wallet cannot pay ETH fees", async ({
   page,
 }) => {
   await openWallets(page);
@@ -246,11 +272,11 @@ test("full jetton withdrawal is blocked when the agent wallet cannot pay TON fee
   await page.getByTestId("withdraw-wallet").click();
   await page.getByRole("button", { name: "USDT", exact: true }).click();
   await page.getByTestId("withdrawal-max").click();
-  await page.getByRole("button", { name: "Preview insufficient TON" }).click();
-  await expect(page.getByRole("heading", { name: "TON balance is too low" })).toBeVisible();
-  await page.getByRole("button", { name: "Top up TON" }).click();
+  await page.getByRole("button", { name: "Preview insufficient ETH" }).click();
+  await expect(page.getByRole("heading", { name: "ETH balance is too low" })).toBeVisible();
+  await page.getByRole("button", { name: "Top up ETH" }).click();
   await expect(page.getByRole("heading", { name: "Top up agent wallet" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "TON", exact: true })).toHaveClass(/is-active/);
+  await expect(page.getByRole("button", { name: "ETH", exact: true })).toHaveClass(/is-active/);
 });
 
 test("representative multi-asset withdrawal flow emits no browser errors", async ({ page }) => {
@@ -263,7 +289,7 @@ test("representative multi-asset withdrawal flow emits no browser errors", async
   await openWallets(page);
   await connectWallet(page);
   await page.getByTestId("withdraw-wallet").click();
-  await page.getByRole("button", { name: "TON", exact: true }).click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
   await page.getByTestId("withdrawal-max").click();
   await page.getByTestId("review-withdrawal").click();
   await page.getByTestId("confirm-withdrawal").click();
@@ -319,7 +345,7 @@ test("activity separates purchases and transfers and preserves delivery pending"
   await page.getByTestId("tab-activity").click();
   await page.getByTestId("activity-filter-transfers").click();
   await expect(page.getByText("USDT top-up credited", { exact: true })).toBeVisible();
-  await expect(page.getByText("TON withdrawal completed", { exact: true })).toBeVisible();
+  await expect(page.getByText("ETH withdrawal completed", { exact: true })).toBeVisible();
   await expect(page.getByText("USDT withdrawal completed", { exact: true })).toBeVisible();
   await expect(page.getByText("Purchase held", { exact: true })).toHaveCount(0);
 
@@ -341,22 +367,22 @@ test("wallets copy synthetic addresses and show equal top-up controls", async ({
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openWallets(page);
-  const agentAddress = page.getByRole("button", { name: "Copy TON agent wallet address" });
-  await expect(agentAddress).toContainText("DEMO-AGENT-WALLET-001");
+  const agentAddress = page.getByRole("button", { name: "Copy Ethereum agent wallet address" });
+  const agentValue = (await agentAddress.innerText()).trim();
+  expect(agentValue).toMatch(/^0x[0-9a-f]{40}$/);
+  await page.setViewportSize({ width: 320, height: 852 });
   await agentAddress.click();
-  await expect
-    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("DEMO-AGENT-WALLET-001");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(agentValue);
 
   await connectWallet(page);
   const externalAddress = page.getByRole("button", { name: "Copy external wallet address" });
-  await expect(externalAddress).toContainText("DEMO-EXTERNAL-WALLET-001");
+  const externalValue = (await externalAddress.innerText()).trim();
+  expect(externalValue).toMatch(/^0x[0-9a-f]{40}$/);
+  expect(externalValue).not.toBe(agentValue);
   await externalAddress.click();
-  await expect
-    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("DEMO-EXTERNAL-WALLET-001");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(externalValue);
 
-  for (const width of [375, 393, 427]) {
+  for (const width of [320, 375, 393, 427]) {
     await page.setViewportSize({ width, height: 852 });
     for (const address of [agentAddress, externalAddress]) {
       const overflow = await address.evaluate(
@@ -369,11 +395,27 @@ test("wallets copy synthetic addresses and show equal top-up controls", async ({
   await page.getByTestId("top-up-wallet").click();
   const tabs = page.locator(".segmented-control--two button");
   await expect(tabs).toHaveCount(2);
-  const [usdtBox, tonBox] = await Promise.all([
+  const [usdtBox, ethBox] = await Promise.all([
     tabs.nth(0).boundingBox(),
     tabs.nth(1).boundingBox(),
   ]);
-  expect(Math.abs((usdtBox?.width ?? 0) - (tonBox?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((usdtBox?.width ?? 0) - (ethBox?.width ?? 0))).toBeLessThanOrEqual(1);
+  await expect(page.getByText(`Demo wallet · ${externalValue}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Agent wallet · ${agentValue}`, { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("withdraw-wallet").click();
+  await expect(page.getByText(`Verified · ${externalValue}`, { exact: true })).toBeVisible();
+  await page.getByTestId("review-withdrawal").click();
+  await expect(page.getByText(externalValue, { exact: true }).last()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("tab-activity").click();
+  await page.getByRole("button", { name: /ETH withdrawal completed/ }).click();
+  await expect(page.getByRole("dialog").getByText(externalValue, { exact: true })).toBeVisible();
+  await page.reload();
+  await openWallets(page);
+  await expect(agentAddress).toHaveText(agentValue);
+  await connectWallet(page);
+  await expect(externalAddress).toHaveText(externalValue);
 });
 
 test("home shows the reference rate and agent-state controls", async ({ page }) => {
@@ -423,7 +465,7 @@ test("dark theme preserves readable foregrounds and chat-card spacing", async ({
   );
   await connectWallet(page);
   await page.getByTestId("withdraw-wallet").click();
-  await page.getByRole("button", { name: "TON", exact: true }).click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
   await page.getByTestId("withdrawal-max").click();
   await expectOpaqueSheet(page, darkSheetTheme);
   await expect(page.getByTestId("bottom-sheet").locator(".risk-note p")).toHaveCSS(
@@ -459,3 +501,68 @@ test("theme controls, focus visibility, and representative widths remain usable"
   await page.getByTestId("tab-chat").focus();
   await expect(page.getByTestId("tab-chat")).toBeFocused();
 });
+
+test("Ethereum onboarding connection persists and disconnect restores transfer gating", async ({
+  page,
+}) => {
+  await page.getByTestId("settings-trigger").click();
+  await page.getByRole("button", { name: "Restart onboarding" }).click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await page.getByRole("button", { name: "Connect Ethereum wallet" }).click();
+  await expect(page.getByTestId("onboarding-connect-wallet")).toHaveText(
+    "External wallet verified",
+  );
+  await page.getByTestId("onboarding-next").click();
+  await page.getByTestId("onboarding-next").click();
+  await openWallets(page);
+  await expect(page.getByText("Verified", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ethereum", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect wallet" }).click();
+  await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
+  for (const action of ["top-up-wallet", "withdraw-wallet"]) {
+    await page.getByTestId(action).click();
+    await expect(page.getByRole("dialog")).toHaveAccessibleName(
+      "Connect an external Ethereum wallet",
+    );
+    await page.keyboard.press("Escape");
+  }
+  await connectWallet(page);
+});
+
+test("fixed ETH withdrawals reserve gas and preserve the reviewed recipient amount", async ({
+  page,
+}) => {
+  await openWallets(page);
+  await connectWallet(page);
+  await page.getByTestId("withdraw-wallet").click();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  for (const invalidAmount of ["0", "-0.1", "invalid", "0.405"]) {
+    await page.getByLabel("Withdrawal amount").fill(invalidAmount);
+    await expect(page.getByTestId("review-withdrawal")).toBeDisabled();
+  }
+  await page.getByLabel("Withdrawal amount").fill("0.404");
+  await expect(page.getByTestId("review-withdrawal")).toBeEnabled();
+  await expect(page.getByText("≈ 0.01 ETH", { exact: true })).toBeVisible();
+  await page.getByTestId("review-withdrawal").click();
+  await expect(page.getByText("0.404 ETH", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("≈ 0.006 ETH", { exact: true })).toBeVisible();
+  await page.getByTestId("confirm-withdrawal").click();
+  await expect(page.getByText(/Waiting for the Ethereum transfer result/)).toBeVisible();
+  await page.getByTestId("complete-withdrawal").click();
+  await expect(page.getByText(/0.404 ETH reached your verified external wallet/)).toBeVisible();
+});
+
+for (const [title, fee] of [
+  ["USDT top-up credited", null],
+  ["ETH withdrawal completed", "0.006 ETH"],
+  ["USDT withdrawal completed", "0.045 ETH"],
+] as const) {
+  test(`${title} activity uses Ethereum network and ETH fees`, async ({ page }) => {
+    await page.getByTestId("tab-activity").click();
+    await page.getByRole("button", { name: new RegExp(title) }).click();
+    await expect(page.getByText("Ethereum Mainnet", { exact: true })).toBeVisible();
+    await expect(page.getByText("Confirmed on Ethereum", { exact: true })).toBeVisible();
+    if (fee) await expect(page.getByText(fee, { exact: true })).toBeVisible();
+  });
+}

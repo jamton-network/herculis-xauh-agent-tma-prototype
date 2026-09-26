@@ -5,7 +5,12 @@ import {
   UpdateIcon,
 } from "@radix-ui/react-icons";
 import type { ActivityItem } from "../types";
-import { statusCopy, demoWallets } from "../demo/fixtures";
+import {
+  statusCopy,
+  demoWallets,
+  withdrawalAssets,
+  formatWithdrawalAmount,
+} from "../demo/fixtures";
 import { StatusBadge } from "../components/StatusBadge";
 
 export function ActivityDetail({ item }: { item: ActivityItem }) {
@@ -44,7 +49,7 @@ export function ActivityDetail({ item }: { item: ActivityItem }) {
         </div>
         <div>
           <dt>Network</dt>
-          <dd>TON Mainnet</dd>
+          <dd>Ethereum Mainnet</dd>
         </div>
         {isPurchase ? (
           <>
@@ -61,12 +66,18 @@ export function ActivityDetail({ item }: { item: ActivityItem }) {
           <>
             <div>
               <dt>{isTopUp ? "Source" : "Destination"}</dt>
-              <dd>{demoWallets.external}</dd>
+              <dd className="wallet-address">{demoWallets.external}</dd>
             </div>
             {!isTopUp ? (
               <div>
                 <dt>Network fee</dt>
-                <dd>{item.amount?.includes("TON") ? "0.006 TON" : "0.045 TON"}</dd>
+                <dd>
+                  {formatWithdrawalAmount(
+                    withdrawalAssets[item.amount?.includes("ETH") ? "ETH" : "USDT"].estimatedFee,
+                    "ETH",
+                  )}{" "}
+                  ETH
+                </dd>
               </div>
             ) : null}
           </>
@@ -88,9 +99,9 @@ export function ActivityDetail({ item }: { item: ActivityItem }) {
           <CheckCircledIcon />
           <div>
             <strong>
-              {isPurchase ? "USDT payment" : isTopUp ? "TON transfer" : "Asset transfer"}
+              {isPurchase ? "USDT payment" : isTopUp ? "Ethereum transfer" : "Asset transfer"}
             </strong>
-            <span>{completed || pending ? "Confirmed on TON" : "Not confirmed"}</span>
+            <span>{completed || pending ? "Confirmed on Ethereum" : "Not confirmed"}</span>
           </div>
         </li>
         {isPurchase ? (

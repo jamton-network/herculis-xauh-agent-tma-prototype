@@ -833,7 +833,7 @@ img {
   font-weight: 800;
 }
 
-.network-badge--ton {
+.network-badge--ethereum {
   background: #e8f8ff;
   color: #0781b9;
 }
@@ -1305,13 +1305,14 @@ img {
 }
 
 .max-button {
+  min-width: 64px;
   min-height: 44px;
-  padding: 0 11px;
+  padding: 0 14px;
   border: 1px solid var(--tg-link);
-  border-radius: 999px;
+  border-radius: 10px;
   background: transparent;
   color: var(--tg-link) !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -1885,7 +1886,7 @@ img {
 .flow-review {
   display: grid;
   padding: 18px;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px 18px;
   border: 1px solid var(--tg-separator);
   border-radius: 14px;
@@ -1973,6 +1974,12 @@ img {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.detail-list dd.wallet-address {
+  min-width: 0;
+  text-align: right;
+  white-space: normal;
 }
 
 .timeline {

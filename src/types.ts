@@ -28,7 +28,7 @@ export type WalletFlow = "connect" | "topup" | "withdraw" | null;
 
 export type TopUpStage = "amount" | "wallet" | "pending" | "credited" | "rejected" | "failed";
 
-export type WithdrawalAsset = "TON" | "USDT" | "XAUH";
+export type WithdrawalAsset = "ETH" | "USDT" | "XAUH";
 
 export type WithdrawalAmountMode = "fixed" | "max";
 
@@ -37,7 +37,7 @@ export type WithdrawalStage =
   | "confirm"
   | "processing"
   | "completed"
-  | "insufficient-ton"
+  | "insufficient-eth"
   | "stale-preview"
   | "failed"
   | "needs-review";

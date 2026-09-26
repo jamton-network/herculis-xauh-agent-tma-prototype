@@ -8,7 +8,7 @@ import {
   RocketIcon,
 } from "@radix-ui/react-icons";
 import type { ConnectedWalletState } from "../types";
-import { demoWallets } from "../demo/fixtures";
+import { demoWallets, withdrawalAssets, formatWithdrawalAmount } from "../demo/fixtures";
 import { IconTile } from "../components/IconTile";
 
 export function WalletsScreen({
@@ -34,8 +34,8 @@ export function WalletsScreen({
         <h1 id="wallets-heading">Wallets</h1>
       </div>
       <p className="intro-copy">
-        Your agent wallet uses USDT to buy XAUH on TON. Connecting an external wallet is optional
-        and it always stays under your control.
+        Your agent wallet uses USDT to buy XAUH on Ethereum. Connecting an external wallet is
+        optional and it always stays under your control.
       </p>
 
       <section className="wallet-card wallet-card--agent" aria-labelledby="agent-wallet-heading">
@@ -46,25 +46,25 @@ export function WalletsScreen({
           <div>
             <h2 id="agent-wallet-heading">Agent wallet</h2>
           </div>
-          <span className="network-badge network-badge--ton">TON</span>
+          <span className="network-badge network-badge--ethereum">Ethereum</span>
         </div>
         <div className="asset-balances" aria-label="Agent wallet balances">
           <div>
             <span>Available to buy</span>
             <strong>
-              825.40 <small>USDT</small>
+              {formatWithdrawalAmount(withdrawalAssets.USDT.balance, "USDT")} <small>USDT</small>
             </strong>
           </div>
           <div>
             <span>Gold holdings</span>
             <strong>
-              12.3456 <small>XAUH</small>
+              {formatWithdrawalAmount(withdrawalAssets.XAUH.balance, "XAUH")} <small>XAUH</small>
             </strong>
           </div>
           <div>
             <span>Fee reserve</span>
             <strong>
-              0.42 <small>TON</small>
+              {formatWithdrawalAmount(withdrawalAssets.ETH.balance, "ETH")} <small>ETH</small>
             </strong>
           </div>
         </div>
@@ -72,7 +72,7 @@ export function WalletsScreen({
           type="button"
           className="address-box"
           onClick={() => onCopy("Agent wallet address")}
-          aria-label="Copy TON agent wallet address"
+          aria-label="Copy Ethereum agent wallet address"
         >
           <span>{demoWallets.agent}</span>
           <CopyIcon />
@@ -138,7 +138,7 @@ export function WalletsScreen({
         ) : (
           <>
             <p className="wallet-explainer">
-              Connect a TON wallet to top up directly and set your withdrawal destination.
+              Connect an Ethereum wallet to top up directly and set your withdrawal destination.
               Connecting never shares your keys or moves funds by itself.
             </p>
             <button
@@ -147,7 +147,7 @@ export function WalletsScreen({
               onClick={onConnect}
               data-testid="connect-wallet"
             >
-              <GlobeIcon /> Connect TON wallet
+              <GlobeIcon /> Connect Ethereum wallet
             </button>
           </>
         )}
@@ -156,8 +156,8 @@ export function WalletsScreen({
       <aside className="risk-note">
         <InfoCircledIcon />
         <p>
-          Purchases use USDT on TON. Payment fees count toward your limits. Withdrawals are manual,
-          and their network fees are paid from the agent wallet in TON.
+          Purchases use USDT on Ethereum. Payment fees count toward your limits. Withdrawals are
+          manual, and their network fees are paid from the agent wallet in ETH.
         </p>
       </aside>
     </main>

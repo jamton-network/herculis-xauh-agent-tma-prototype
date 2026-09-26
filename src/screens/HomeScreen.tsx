@@ -9,7 +9,7 @@ import {
   RocketIcon,
 } from "@radix-ui/react-icons";
 import type { TabId, AgentMode, ActivityItem } from "../types";
-import { activityItems } from "../demo/fixtures";
+import { activityItems, withdrawalAssets, formatWithdrawalAmount } from "../demo/fixtures";
 import { IconTile } from "../components/IconTile";
 
 export function HomeScreen({
@@ -37,7 +37,7 @@ export function HomeScreen({
   const body = isPaused
     ? "Your limits remain saved. Resume when you want the agent to monitor again."
     : isInsufficient
-      ? "Add USDT on TON or lower your reserve before purchases can continue."
+      ? "Add USDT on Ethereum or lower your reserve before purchases can continue."
       : "The current quote exceeds your 0.8% price-markup limit. I’ll continue monitoring.";
 
   return (
@@ -94,7 +94,7 @@ export function HomeScreen({
             <CardStackIcon />
           </IconTile>
           <span className="summary-copy">
-            <span className="summary-label">TON agent wallet</span>
+            <span className="summary-label">Ethereum agent wallet</span>
             <span className="summary-value">
               825.40 <small>USDT</small>
             </span>
@@ -106,9 +106,10 @@ export function HomeScreen({
             <LockClosedIcon />
           </IconTile>
           <span className="summary-copy">
-            <span className="summary-label">TON fee reserve</span>
+            <span className="summary-label">ETH fee reserve</span>
             <span className="summary-value">
-              0.42 <small>TON · Ready</small>
+              {formatWithdrawalAmount(withdrawalAssets.ETH.balance, "ETH")}{" "}
+              <small>ETH · Ready</small>
             </span>
           </span>
           <ChevronRightIcon className="row-chevron" />
@@ -153,7 +154,7 @@ export function HomeScreen({
           </IconTile>
           <span className="activity-copy">
             <strong>USDT top-up credited</strong>
-            <span>External wallet transfer confirmed on TON</span>
+            <span>External wallet transfer confirmed on Ethereum</span>
           </span>
           <time>08:24</time>
           <ChevronRightIcon className="row-chevron" />
