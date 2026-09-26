@@ -15,11 +15,17 @@ for (const theme of ["light", "dark"]) {
       ]) {
         await page.goto(`/?theme=${theme}&${route}`);
         await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", theme);
+        const settings = page.getByRole("button", { name: "Open demo settings" });
+        await expect(settings).toBeInViewport();
+        const settingsBounds = await settings.boundingBox();
+        expect(settingsBounds!.width).toBe(44);
+        expect(settingsBounds!.height).toBe(44);
         const layout = await page.evaluate(() => {
           const app = document.querySelector<HTMLElement>(".app-shell")!;
           const content = document.querySelector<HTMLElement>("main")!;
           const scroll = document.querySelector<HTMLElement>(".app-scroll")!;
           const header = document.querySelector<HTMLElement>(".brand-header")!;
+          const title = document.querySelector<HTMLElement>(".brand-title-wrap")!;
           return {
             width: app.getBoundingClientRect().width,
             height: app.getBoundingClientRect().height,
@@ -27,9 +33,11 @@ for (const theme of ["light", "dark"]) {
             overflow: Math.max(
               app.scrollWidth - app.clientWidth,
               content.scrollWidth - content.clientWidth,
+              header.scrollWidth - header.clientWidth,
             ),
             scrollTop: scroll.getBoundingClientRect().top,
             headerBottom: header.getBoundingClientRect().bottom,
+            titleRight: title.getBoundingClientRect().right,
           };
         });
         expect(layout.width).toBe(width);
@@ -37,6 +45,7 @@ for (const theme of ["light", "dark"]) {
         expect(layout.contentWidth).toBeLessThanOrEqual(1120);
         expect(layout.overflow).toBeLessThanOrEqual(1);
         expect(layout.scrollTop).toBeGreaterThanOrEqual(layout.headerBottom);
+        expect(settingsBounds!.x).toBeGreaterThan(layout.titleRight);
         if (!route.startsWith("view")) {
           const nav = await page.getByRole("navigation").boundingBox();
           expect(nav!.y + nav!.height).toBeCloseTo(844, 0);
@@ -84,9 +93,14 @@ test("dialogs provide descriptions, trap focus, and restore focus after dismissa
   page,
 }) => {
   await page.goto("/");
-  const trigger = page.getByTestId("settings-trigger");
-  await trigger.click();
+  const trigger = page.getByRole("button", { name: "Open demo settings" });
   const dialog = page.getByRole("dialog");
+  await page.keyboard.press("Tab");
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+  await page.locator(".brand-coin").click();
+  await expect(dialog).toHaveCount(0);
+  await trigger.click();
   await expect(dialog).toHaveAccessibleName("Demo settings");
   await expect(dialog).toHaveAccessibleDescription(
     "Choose a theme and explore the simulated experience.",
@@ -98,9 +112,13 @@ test("dialogs provide descriptions, trap focus, and restore focus after dismissa
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await trigger.click();
-  await page.getByRole("button", { name: "Dismiss dialog" }).click();
-  await expect(trigger).toBeFocused();
+  for (const key of ["Enter", "Space"]) {
+    await trigger.press(key);
+    await expect(dialog).toBeVisible();
+    await page.getByRole("button", { name: "Dismiss dialog" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
 });
 
 test("system theme changes update both the app and open dialogs", async ({ page }) => {

@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the [local demo](http://127.0.0.1:4173). Click the coin in the header to change themes, restart onboarding, or explore additional demo states.
+Open the [local demo](http://127.0.0.1:4173). Click the settings gear button on the right side of the header to change themes, restart onboarding, or explore additional demo states.
 
 ## Commands
 

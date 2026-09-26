@@ -127,25 +127,17 @@ img {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  gap: 13px;
   min-height: calc(76px + env(safe-area-inset-top));
   padding: calc(12px + env(safe-area-inset-top)) max(24px, calc((100% - 1064px) / 2)) 12px;
   border-bottom: 1px solid var(--tg-separator);
   background: var(--tg-bg);
 }
 
-.brand-button {
-  display: grid;
+.brand-settings-button {
   flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
 }
 
-.brand-button:focus-visible,
 .app-shell button:focus-visible,
 .app-shell input:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--tg-link) 40%, transparent) !important;
@@ -154,14 +146,15 @@ img {
 
 .brand-coin {
   display: block;
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
   object-fit: contain;
 }
 
 .brand-title-wrap {
+  flex: 1;
   min-width: 0;
-  margin-left: 13px;
 }
 
 .brand-title,
