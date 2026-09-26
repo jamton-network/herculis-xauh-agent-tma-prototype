@@ -17,6 +17,8 @@ import { chooseDemoStrategy } from "../demo/strategyRandom";
 import { IconTile } from "../components/IconTile";
 import { AquaAttribution } from "../components/AquaAttribution";
 import { QuantisStrategyChooser } from "../components/QuantisStrategyChooser";
+import { AquaExecution } from "../components/AquaExecution";
+import { compareExecution } from "../demo/execution";
 
 export function TradingStrategyScreen({
   agentMode,
@@ -40,6 +42,7 @@ export function TradingStrategyScreen({
   const [randomResult, setRandomResult] = useState("");
   const [drawNumber, setDrawNumber] = useState(0);
   const { selectedStrategy, drafts, limits } = draft;
+  const comparison = compareExecution(draft);
   const savedTemplate = strategyTemplates.find(
     (template) => template.id === savedConfiguration.selectedStrategy,
   );
@@ -83,12 +86,14 @@ export function TradingStrategyScreen({
         <>
           <StrategyField
             label="Purchase amount"
+            invalid={comparison.invalidFields.includes("Purchase amount")}
             value={selectedDraft.amount}
             unit="USDT"
             onChange={(value) => updateDraft("amount", value)}
           />
           <StrategyField
             label="Buy at or below"
+            invalid={comparison.invalidFields.includes("Buy at or below")}
             value={selectedDraft.targetPrice}
             unit="USD/XAUH"
             onChange={(value) => updateDraft("targetPrice", value)}
@@ -102,18 +107,21 @@ export function TradingStrategyScreen({
         <>
           <StrategyField
             label="Purchase amount"
+            invalid={comparison.invalidFields.includes("Purchase amount")}
             value={selectedDraft.amount}
             unit="USDT"
             onChange={(value) => updateDraft("amount", value)}
           />
           <StrategyField
             label="Day"
+            invalid={comparison.invalidFields.includes("Day")}
             value={selectedDraft.day}
             onChange={(value) => updateDraft("day", value)}
             inputMode="text"
           />
           <StrategyField
             label="Local time"
+            invalid={comparison.invalidFields.includes("Local time")}
             value={selectedDraft.time}
             onChange={(value) => updateDraft("time", value)}
             inputMode="text"
@@ -127,12 +135,14 @@ export function TradingStrategyScreen({
         <>
           <StrategyField
             label="Purchase amount"
+            invalid={comparison.invalidFields.includes("Purchase amount")}
             value={selectedDraft.amount}
             unit="USDT"
             onChange={(value) => updateDraft("amount", value)}
           />
           <StrategyField
             label="Keep at least"
+            invalid={comparison.invalidFields.includes("Keep at least")}
             value={selectedDraft.reserve}
             unit="USDT"
             onChange={(value) => updateDraft("reserve", value)}
@@ -145,18 +155,21 @@ export function TradingStrategyScreen({
       <>
         <StrategyField
           label="Purchase amount"
+          invalid={comparison.invalidFields.includes("Purchase amount")}
           value={selectedDraft.amount}
           unit="USDT"
           onChange={(value) => updateDraft("amount", value)}
         />
         <StrategyField
           label="Drop from recent high"
+          invalid={comparison.invalidFields.includes("Drop from recent high")}
           value={selectedDraft.dipPercent}
           unit="%"
           onChange={(value) => updateDraft("dipPercent", value)}
         />
         <StrategyField
           label="Recent-high window"
+          invalid={comparison.invalidFields.includes("Recent-high window")}
           value={selectedDraft.lookbackDays}
           unit="days"
           onChange={(value) => updateDraft("lookbackDays", value)}
@@ -234,6 +247,11 @@ export function TradingStrategyScreen({
                 <span className="strategy-option-copy">
                   <strong>{template.title}</strong>
                   <small id={`strategy-description-${template.id}`}>{template.description}</small>
+                  {isSelected ? (
+                    <small className="strategy-execution">
+                      Aqua execution · {comparison.recommendation?.offer.name ?? "Review settings"}
+                    </small>
+                  ) : null}
                 </span>
                 {isSelected ? <em>Selected</em> : null}
               </label>
@@ -244,6 +262,7 @@ export function TradingStrategyScreen({
       <section className="strategy-section" aria-labelledby="strategy-settings-heading">
         <h2 id="strategy-settings-heading">Strategy settings</h2>
         <div className="strategy-fields">{strategySettings}</div>
+        <AquaExecution comparison={comparison} />
       </section>
       <section className="strategy-section" aria-labelledby="shared-limits-heading">
         <h2 id="shared-limits-heading">Purchase limits</h2>
@@ -259,6 +278,10 @@ export function TradingStrategyScreen({
                 <input
                   inputMode="decimal"
                   aria-label={label}
+                  aria-invalid={comparison.invalidFields.includes(label) || undefined}
+                  aria-describedby={
+                    comparison.invalidFields.includes(label) ? "execution-input-errors" : undefined
+                  }
                   value={limits[key]}
                   onChange={(event) =>
                     setDraft({ ...draft, limits: { ...limits, [key]: event.target.value } })
@@ -317,12 +340,14 @@ function StrategyField({
   unit,
   onChange,
   inputMode = "decimal",
+  invalid = false,
 }: {
   label: string;
   value: string;
   unit?: string;
   onChange: (value: string) => void;
   inputMode?: "decimal" | "text";
+  invalid?: boolean;
 }) {
   return (
     <label className="strategy-field">
@@ -331,6 +356,8 @@ function StrategyField({
         <input
           inputMode={inputMode}
           aria-label={label}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? "execution-input-errors" : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />

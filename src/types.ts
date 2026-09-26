@@ -70,6 +70,57 @@ export type StrategyConfiguration = {
 
 export type StrategyEditorDraft = StrategyConfiguration & { selectedStrategy: StrategyId };
 
+export type ExecutionFamily = "constant-product" | "concentrated-liquidity";
+
+export type ExecutionOffer = {
+  id: string;
+  name: string;
+  family: ExecutionFamily;
+  tokenIn: string;
+  tokenOut: string;
+  network: string;
+  settlement: string;
+  feePpm: bigint;
+  reserveIn: bigint;
+  reserveOut: bigint;
+  availableOut: bigint;
+  maxInput: bigint;
+  priceRange?: { min: bigint; max: bigint };
+};
+
+export type ExecutionContext = {
+  balance: bigint;
+  spentToday: bigint;
+  spentThisMonth: bigint;
+  paymentFee: bigint;
+  referencePrice: bigint;
+  usdPerUsdt: bigint;
+};
+
+export type ExecutionEstimate = {
+  offer: ExecutionOffer;
+  reasons: string[];
+  quote?: {
+    amount: bigint;
+    swapFee: bigint;
+    paymentFee: bigint;
+    total: bigint;
+    output: bigint;
+    effectivePrice: bigint;
+    priceVsReference: bigint;
+  };
+};
+
+export type ExecutionComparison = {
+  status: "invalid" | "unavailable" | "ready";
+  invalidFields: string[];
+  condition: string;
+  estimates: ExecutionEstimate[];
+  recommendation?: ExecutionEstimate;
+  explanation: string;
+  context: ExecutionContext;
+};
+
 export type ActivityItem = {
   id: string;
   title: string;

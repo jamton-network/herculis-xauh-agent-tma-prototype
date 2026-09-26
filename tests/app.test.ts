@@ -315,7 +315,7 @@ test("four trading strategies preserve drafts and support save, pause, resume, a
   await page.getByTestId("strategy-dip-buy").click();
   await expect(page.getByLabel("Drop from recent high")).toHaveValue("2");
   await expect(page.getByLabel("Recent-high window")).toHaveValue("7");
-  await expect(page.getByText("Once every 7 days")).toBeVisible();
+  await expect(page.getByText("Once every 7 days", { exact: true })).toBeVisible();
 
   await page.getByTestId("strategy-weekly-dca").click();
   await expect(page.getByLabel("Purchase amount")).toHaveValue("75");

@@ -1280,6 +1280,7 @@ img {
 
 .strategy-title {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .strategy-title .aqua-attribution {
@@ -1433,6 +1434,7 @@ img {
   display: grid;
   min-width: 0;
   gap: 4px;
+  overflow-wrap: anywhere;
 }
 
 .strategy-options strong {
@@ -1595,6 +1597,182 @@ img {
 .strategy-fields {
   margin-top: 12px;
   border-top: 1px solid var(--tg-separator);
+}
+
+.strategy-options .strategy-execution {
+  color: var(--tg-text);
+  line-height: 1.5;
+}
+
+.execution-panel {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 14px;
+  background: var(--tg-surface);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.execution-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.execution-panel h3,
+.execution-panel h4 {
+  margin: 0;
+  color: var(--tg-text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.execution-pair,
+.execution-kicker {
+  color: var(--tg-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.execution-kicker {
+  margin: 0 0 4px;
+}
+
+.execution-help {
+  margin: 8px 0 0;
+  color: var(--tg-text-secondary);
+}
+
+.execution-condition {
+  margin: 16px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--gold);
+  color: var(--tg-text-secondary);
+}
+
+.execution-recommendation,
+.execution-option {
+  padding: 16px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 10px;
+  background: var(--tg-bg);
+}
+
+.execution-recommendation {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.execution-metrics,
+.execution-details {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.execution-metrics > div,
+.execution-details > div {
+  min-width: 0;
+}
+
+.execution-panel dt {
+  color: var(--tg-text-secondary);
+  font-size: 0.75rem;
+}
+
+.execution-panel dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.execution-metrics dd {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.execution-metrics small {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.execution-reason {
+  display: grid;
+  gap: 4px;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.execution-reason span {
+  color: var(--tg-text-secondary);
+}
+
+.execution-disclosure {
+  margin-top: 16px;
+}
+
+.execution-disclosure > summary {
+  min-height: 44px;
+  padding-block: 10px;
+  color: var(--tg-text);
+  font-weight: 650;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.execution-options {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.execution-empty {
+  margin-top: 16px;
+}
+
+.execution-empty ul,
+.execution-rejections {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 0;
+  padding-left: 20px;
+  color: var(--tg-text-secondary);
+}
+
+.execution-comparison-details {
+  border-top: 1px solid var(--tg-separator);
+}
+
+.execution-panel .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.strategy-field input[aria-invalid="true"] {
+  outline: 1px solid var(--red);
+  outline-offset: -1px;
+}
+
+@media (min-width: 600px) {
+  .execution-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .execution-details > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 12px;
+  }
 }
 
 .strategy-field,
