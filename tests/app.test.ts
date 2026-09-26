@@ -25,13 +25,19 @@ async function expectOpaqueSheet(
     const sheetStyle = window.getComputedStyle(element);
     const overlay = document.querySelector<HTMLElement>("[data-testid='sheet-overlay']");
     const screen = document.documentElement;
+    const themeColor = (property: string) =>
+      sheetStyle
+        .getPropertyValue(property)
+        .trim()
+        .toLowerCase()
+        .replace(/^#([\da-f])([\da-f])([\da-f])$/, "#$1$1$2$2$3$3");
 
     return {
       background: sheetStyle.backgroundColor,
       foreground: sheetStyle.color,
       opacity: sheetStyle.opacity,
-      themeBackgroundToken: sheetStyle.getPropertyValue("--tg-bg").trim().toLowerCase(),
-      themeForegroundToken: sheetStyle.getPropertyValue("--tg-text").trim().toLowerCase(),
+      themeBackgroundToken: themeColor("--tg-bg"),
+      themeForegroundToken: themeColor("--tg-text"),
       screenTheme: screen.dataset.theme,
       overlay: overlay ? window.getComputedStyle(overlay).backgroundColor : null,
     };

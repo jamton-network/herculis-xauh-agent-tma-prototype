@@ -50,6 +50,10 @@ npm run validate
 
 Installing dependencies enables a pre-commit hook that applies safe lint fixes and formats staged files. See the [contributor guide](CONTRIBUTING.md) for editor setup, workflow, and validation details.
 
+## Deployment
+
+GitHub Actions validates pull requests targeting `main` and pushes to `main`. Successful pushes in the upstream repository deploy the tested static build to the [Cloudflare Pages demo](https://herculis-xauh-agent-demo.pages.dev).
+
 ## License
 
 Project code and included project assets are available under the [MIT license](LICENSE). Dependencies retain their respective licenses. The project name and branding do not imply endorsement of derivatives.
