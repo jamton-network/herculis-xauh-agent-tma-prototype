@@ -1,5 +1,5 @@
 import { useViewport, useSystemTheme } from "./hooks/browser";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   ActivityLogIcon,
   CheckCircledIcon,
@@ -30,8 +30,15 @@ import type {
   WithdrawalAmountMode,
   WithdrawalStage,
   ActivityItem,
+  StrategyConfiguration,
 } from "./types";
-import { withdrawalAssets, formatWithdrawalAmount, demoWallets } from "./demo/fixtures";
+import {
+  withdrawalAssets,
+  formatWithdrawalAmount,
+  demoWallets,
+  initialStrategyConfiguration,
+  strategyTemplates,
+} from "./demo/fixtures";
 import { IconTile } from "./components/IconTile";
 import { BrandHeader } from "./components/BrandHeader";
 import { BottomNav } from "./components/BottomNav";
@@ -58,6 +65,10 @@ export default function App() {
     return requestedTheme === "light" || requestedTheme === "dark" ? requestedTheme : "system";
   });
   const [agentMode, setAgentMode] = useState<AgentMode>("monitoring");
+  const [strategyConfiguration, setStrategyConfiguration] = useState<StrategyConfiguration>(() =>
+    structuredClone(initialStrategyConfiguration),
+  );
+  const restoreStrategyFocus = useRef(false);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [activityDataState, setActivityDataState] = useState<ActivityDataState>("ready");
   const [connectedWallet, setConnectedWallet] = useState<ConnectedWalletState>("disconnected");
@@ -81,6 +92,23 @@ export default function App() {
   const [confirmAction, setConfirmAction] = useState<"remove-strategy" | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const [toast, setToast] = useState("");
+  const savedStrategyTitle = strategyTemplates.find(
+    (template) => template.id === strategyConfiguration.selectedStrategy,
+  )?.title;
+
+  useEffect(() => {
+    if (showStrategy || showOnboarding || !restoreStrategyFocus.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>("[data-strategy-entry]")?.focus();
+      restoreStrategyFocus.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showStrategy, showOnboarding]);
+
+  const closeStrategy = () => {
+    restoreStrategyFocus.current = true;
+    setShowStrategy(false);
+  };
 
   const effectiveTheme = useMemo(() => {
     if (theme !== "system") return theme;
@@ -137,7 +165,7 @@ export default function App() {
     document.documentElement.style.colorScheme = effectiveTheme;
   }, [effectiveTheme]);
 
-  const notify = (message = "Demo action completed") => {
+  const notify = (message = "Action completed") => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2400);
   };
@@ -180,7 +208,7 @@ export default function App() {
       );
       notify(`${label} copied`);
     } catch {
-      notify("Could not copy the demo address. Try again in a supported browser.");
+      notify("Could not copy the address. Try again in a supported browser.");
     }
   };
 
@@ -195,8 +223,7 @@ export default function App() {
           <Onboarding
             onComplete={() => {
               setShowOnboarding(false);
-              setAgentMode("monitoring");
-              notify("Trading strategy enabled");
+              notify("Ready");
             }}
             onCancel={() => setShowOnboarding(false)}
             connectedWallet={connectedWallet === "connected"}
@@ -226,9 +253,15 @@ export default function App() {
         <div key="strategy" className="app-scroll">
           <TradingStrategyScreen
             agentMode={agentMode}
-            onBack={() => setShowStrategy(false)}
-            onSave={() => notify("Trading strategy saved")}
+            savedConfiguration={strategyConfiguration}
+            onBack={closeStrategy}
+            onSave={(configuration) => {
+              if (!strategyConfiguration.selectedStrategy) setAgentMode("paused");
+              setStrategyConfiguration(structuredClone(configuration));
+              notify("Trading strategy saved");
+            }}
             onPause={() => {
+              if (!strategyConfiguration.selectedStrategy) return;
               setAgentMode((mode) => (mode === "paused" ? "monitoring" : "paused"));
               notify(
                 agentMode === "paused" ? "Trading strategy resumed" : "Trading strategy paused",
@@ -247,6 +280,8 @@ export default function App() {
           {activeTab === "home" ? (
             <HomeScreen
               agentMode={agentMode}
+              savedStrategyTitle={savedStrategyTitle}
+              savedLimits={strategyConfiguration.limits}
               onOpenAgentState={() => setAgentStateOpen(true)}
               onOpenStrategy={() => setShowStrategy(true)}
               onChangeTab={changeTab}
@@ -281,8 +316,8 @@ export default function App() {
       <BottomSheet
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        title="Demo settings"
-        description="Choose a theme and explore the simulated experience."
+        title="Settings"
+        description="Customize your experience and explore app states."
       >
         <div className="settings-list">
           <div className="setting-row">
@@ -315,6 +350,7 @@ export default function App() {
             className="sheet-action"
             onClick={() => {
               setSettingsOpen(false);
+              setShowStrategy(false);
               setShowOnboarding(true);
             }}
           >
@@ -330,7 +366,7 @@ export default function App() {
               setActivityDataState("ready");
             }}
           >
-            <ActivityLogIcon /> Browse all demo states <ChevronRightIcon />
+            <ActivityLogIcon /> Activity states <ChevronRightIcon />
           </button>
           <button
             type="button"
@@ -341,7 +377,7 @@ export default function App() {
               setActivityDataState("loading");
             }}
           >
-            <UpdateIcon /> Preview activity loading <ChevronRightIcon />
+            <UpdateIcon /> Activity loading <ChevronRightIcon />
           </button>
           <button
             type="button"
@@ -352,10 +388,10 @@ export default function App() {
               setActivityDataState("empty");
             }}
           >
-            <ActivityLogIcon /> Preview empty activity <ChevronRightIcon />
+            <ActivityLogIcon /> Empty activity <ChevronRightIcon />
           </button>
           <p className="mock-note">
-            <InfoCircledIcon /> Mock-only: no wallet, payment, Telegram, model, or backend calls.
+            <InfoCircledIcon /> Preview environment: sample data, no real transactions.
           </p>
         </div>
       </BottomSheet>
@@ -363,7 +399,7 @@ export default function App() {
       <BottomSheet
         open={agentStateOpen}
         onOpenChange={setAgentStateOpen}
-        title="Preview agent state"
+        title="Agent status"
         description="Use these controls to review the main operating states."
       >
         <div className="state-options">
@@ -382,8 +418,10 @@ export default function App() {
             <button
               type="button"
               key={mode}
+              disabled={!strategyConfiguration.selectedStrategy && mode !== "paused"}
               className={agentMode === mode ? "is-active" : ""}
               onClick={() => {
+                if (!strategyConfiguration.selectedStrategy && mode !== "paused") return;
                 setAgentMode(mode);
                 setAgentStateOpen(false);
               }}
@@ -405,7 +443,7 @@ export default function App() {
         onOpenChange={(open) => {
           if (!open) setWalletFlow(null);
         }}
-        title="Connect an external Ethereum wallet"
+        title="Connect your Ethereum wallet"
         description="A secure check confirms that this wallet belongs to you. The agent never receives your keys."
       >
         <div className="wallet-flow">
@@ -428,7 +466,7 @@ export default function App() {
               <IconTile size="large">
                 <GlobeIcon />
               </IconTile>
-              <h3>Try a demo wallet connection</h3>
+              <h3>Ready to connect</h3>
             </div>
           )}
           <button
@@ -449,14 +487,14 @@ export default function App() {
               className="text-button"
               onClick={() => setConnectedWallet("wrong-network")}
             >
-              Preview wrong network
+              Wrong network
             </button>
             <button
               type="button"
               className="text-button"
               onClick={() => setConnectedWallet("proof-failed")}
             >
-              Preview verification failure
+              Verification failure
             </button>
           </div>
         </div>
@@ -507,7 +545,7 @@ export default function App() {
               <dl className="detail-list detail-list--compact">
                 <div>
                   <dt>From</dt>
-                  <dd className="wallet-address">Demo wallet · {demoWallets.external}</dd>
+                  <dd className="wallet-address">External wallet · {demoWallets.external}</dd>
                 </div>
                 <div>
                   <dt>To</dt>
@@ -552,7 +590,7 @@ export default function App() {
                 onClick={() => setTopUpStage("pending")}
                 data-testid="confirm-top-up"
               >
-                Simulate wallet approval
+                Approve transfer
               </button>
               <div className="preview-actions">
                 <button
@@ -560,14 +598,14 @@ export default function App() {
                   className="text-button"
                   onClick={() => setTopUpStage("rejected")}
                 >
-                  Preview rejection
+                  Rejection
                 </button>
                 <button
                   type="button"
                   className="text-button"
                   onClick={() => setTopUpStage("failed")}
                 >
-                  Preview failed submission
+                  Failed submission
                 </button>
               </div>
             </>
@@ -587,7 +625,7 @@ export default function App() {
                 onClick={() => setTopUpStage("credited")}
                 data-testid="complete-top-up"
               >
-                Simulate Ethereum confirmation
+                Continue
               </button>
             </>
           ) : topUpStage === "credited" ? (
@@ -756,14 +794,14 @@ export default function App() {
                   className="text-button"
                   onClick={() => setWithdrawalStage("insufficient-eth")}
                 >
-                  Preview insufficient ETH
+                  Insufficient ETH
                 </button>
                 <button
                   type="button"
                   className="text-button"
                   onClick={() => setWithdrawalStage("stale-preview")}
                 >
-                  Preview changed fee
+                  Changed fee
                 </button>
               </div>
             </>
@@ -818,7 +856,7 @@ export default function App() {
                 onClick={() => setWithdrawalStage("completed")}
                 data-testid="complete-withdrawal"
               >
-                Simulate confirmation
+                Continue
               </button>
               <div className="preview-actions">
                 <button
@@ -826,14 +864,14 @@ export default function App() {
                   className="text-button"
                   onClick={() => setWithdrawalStage("failed")}
                 >
-                  Preview failure
+                  Failure
                 </button>
                 <button
                   type="button"
                   className="text-button"
                   onClick={() => setWithdrawalStage("needs-review")}
                 >
-                  Preview unclear result
+                  Unclear result
                 </button>
               </div>
             </>
@@ -945,7 +983,9 @@ export default function App() {
         }}
         title={selectedActivity?.title ?? "Purchase activity"}
         description={
-          selectedActivity ? `${selectedActivity.id} · ${selectedActivity.time}` : undefined
+          selectedActivity
+            ? `${selectedActivity.id.replace(/^DEMO-/, "")} · ${selectedActivity.time}`
+            : undefined
         }
       >
         {selectedActivity ? <ActivityDetail item={selectedActivity} /> : null}
@@ -957,7 +997,7 @@ export default function App() {
           if (!open) setConfirmAction(null);
         }}
         title="Remove this strategy?"
-        description="This stops autonomous purchases. You can choose and approve a new strategy later."
+        description={`Remove ${savedStrategyTitle ?? "the saved strategy"} and stop autonomous purchases? Unsaved edits will be discarded. Saved parameters and purchase limits stay available for your next strategy.`}
       >
         <div className="confirmation-actions">
           <button
@@ -965,8 +1005,12 @@ export default function App() {
             className="button button--danger-filled"
             onClick={() => {
               setConfirmAction(null);
+              setStrategyConfiguration((configuration) => ({
+                ...configuration,
+                selectedStrategy: null,
+              }));
               setAgentMode("paused");
-              setShowStrategy(false);
+              closeStrategy();
               notify("Trading strategy removed");
             }}
           >

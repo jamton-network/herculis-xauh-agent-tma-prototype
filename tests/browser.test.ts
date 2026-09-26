@@ -14,8 +14,22 @@ for (const theme of ["light", "dark"]) {
         "view=strategy",
       ]) {
         await page.goto(`/?theme=${theme}&${route}`);
+        if (route === "view=strategy") {
+          await page.evaluate(() => {
+            Object.defineProperty(crypto, "getRandomValues", {
+              value: (array: Uint8Array) => array.fill(2),
+            });
+          });
+          const draw = page.getByRole("button", { name: "Choose randomly with Quantis" });
+          await draw.click();
+          await draw.click();
+          await expect(page.getByRole("status", { name: "Random strategy result" })).toHaveText(
+            "Draw 2: Reserve buy. Selected again.",
+          );
+          await expect(page.getByRole("radio", { name: "Reserve buy" })).toBeChecked();
+        }
         await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", theme);
-        const settings = page.getByRole("button", { name: "Open demo settings" });
+        const settings = page.getByRole("button", { name: "Open settings" });
         await expect(settings).toBeInViewport();
         const settingsBounds = await settings.boundingBox();
         expect(settingsBounds!.width).toBe(44);
@@ -79,7 +93,7 @@ test("native chat input and scroll stay usable when the visible viewport shrinks
   expect(composer!.y + composer!.height).toBeLessThanOrEqual(nav!.y);
   await input.press("Enter");
   await expect(page.getByText("Explain the demo strategy", { exact: true })).toBeVisible();
-  await expect(page.getByText(/This is a simulated reply/)).toBeVisible();
+  await expect(page.getByText(/You can review your trading strategy/)).toBeVisible();
   await expect(input).toHaveValue("");
   await expect(page.getByTestId("send-message")).toBeDisabled();
   await expect
@@ -93,7 +107,7 @@ test("dialogs provide descriptions, trap focus, and restore focus after dismissa
   page,
 }) => {
   await page.goto("/");
-  const trigger = page.getByRole("button", { name: "Open demo settings" });
+  const trigger = page.getByRole("button", { name: "Open settings" });
   const dialog = page.getByRole("dialog");
   await page.keyboard.press("Tab");
   await expect(trigger).toBeFocused();
@@ -101,9 +115,9 @@ test("dialogs provide descriptions, trap focus, and restore focus after dismissa
   await page.locator(".brand-coin").click();
   await expect(dialog).toHaveCount(0);
   await trigger.click();
-  await expect(dialog).toHaveAccessibleName("Demo settings");
+  await expect(dialog).toHaveAccessibleName("Settings");
   await expect(dialog).toHaveAccessibleDescription(
-    "Choose a theme and explore the simulated experience.",
+    "Customize your experience and explore app states.",
   );
   for (let index = 0; index < 14; index++) {
     await page.keyboard.press("Tab");
@@ -141,7 +155,7 @@ test("clipboard failure reports the failure without claiming success", async ({ 
     });
   });
   await page.getByRole("button", { name: "Copy Ethereum agent wallet address" }).click();
-  await expect(page.getByRole("status")).toContainText("Could not copy the demo address");
+  await expect(page.getByRole("status")).toContainText("Could not copy the address");
 });
 
 test("demo interactions make no external requests", async ({ page }) => {
@@ -179,7 +193,12 @@ test("demo interactions make no external requests", async ({ page }) => {
   await page.getByTestId("tab-chat").click();
   await page.getByRole("textbox").fill("Test a demo reply");
   await page.getByTestId("send-message").click();
-  await expect(page.getByText(/This is a simulated reply/)).toBeVisible();
+  await expect(page.getByText(/You can review your trading strategy/)).toBeVisible();
+  await page.getByRole("button", { name: "Open trading strategy" }).click();
+  await page.getByRole("button", { name: "Choose randomly with Quantis" }).click();
+  await page.getByRole("button", { name: "Save strategy" }).click();
+  await page.getByRole("button", { name: "Pause strategy" }).click();
+  await page.getByRole("button", { name: "Resume strategy" }).click();
   expect(externalRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
@@ -204,7 +223,7 @@ test("Ethereum connection dialog supports keyboard navigation and dismissal", as
   await trigger.focus();
   await trigger.press("Enter");
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toHaveAccessibleName("Connect an external Ethereum wallet");
+  await expect(dialog).toHaveAccessibleName("Connect your Ethereum wallet");
   await expect(dialog).toHaveAccessibleDescription(/secure check confirms/);
   for (let index = 0; index < 8; index++) {
     await page.keyboard.press("Tab");

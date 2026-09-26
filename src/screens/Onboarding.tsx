@@ -27,10 +27,10 @@ export function Onboarding({
       icon: <PersonIcon />,
       eyebrow: "Telegram identity",
       title: "One agent across bot and TMA",
-      copy: "Explore how one account brings together a wallet, conversation, trading strategy, and purchase history. Everything in this demo is simulated.",
+      copy: "Keep your wallet, chat, trading strategies, and activity history together in one place.",
       details: [
-        "Explore a simulated account and conversation",
-        "No sign-in or Telegram connection required",
+        "Review balances and talk to your portfolio assistant",
+        "Manage strategies and follow your activity",
       ],
     },
     {
@@ -52,7 +52,7 @@ export function Onboarding({
     },
     {
       icon: <FileTextIcon />,
-      eyebrow: "Explicit consent",
+      eyebrow: "Your strategy",
       title: "Choose a trading strategy",
       copy: "Choose one of four strategies and set the amount and safety limits. Withdrawals always remain manual.",
       details: [
@@ -68,7 +68,7 @@ export function Onboarding({
       <div className="onboarding-top">
         <img src="/assets/xauh-coin.png" alt="" className="onboarding-coin" draggable={false} />
         <button type="button" className="text-button" onClick={onCancel}>
-          Preview app
+          Open app
         </button>
       </div>
       <div className="step-progress" aria-label={`Step ${step + 1} of ${steps.length}`}>
@@ -103,13 +103,7 @@ export function Onboarding({
           </button>
         ) : null}
         {step === 3 ? (
-          <label className="consent-control">
-            <input type="checkbox" defaultChecked />
-            <span>
-              I understand this demo uses simulated balances and transactions. No real funds are
-              used.
-            </span>
-          </label>
+          <p className="onboarding-note">Review your strategy settings before saving.</p>
         ) : null}
       </div>
       <div className="onboarding-actions">
@@ -128,7 +122,7 @@ export function Onboarding({
           onClick={() => (step === steps.length - 1 ? onComplete() : setStep(step + 1))}
           data-testid="onboarding-next"
         >
-          {step === steps.length - 1 ? "Start demo" : "Continue"}
+          {step === steps.length - 1 ? "Get started" : "Continue"}
           <ChevronRightIcon />
         </button>
       </div>

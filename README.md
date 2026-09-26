@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the [local demo](http://127.0.0.1:4173). Click the settings gear button on the right side of the header to change themes, restart onboarding, or explore additional demo states.
+Open the [local demo](http://127.0.0.1:4173). Open **Settings** using the gear button on the right side of the header to change themes, restart onboarding, or choose **Activity states** to explore additional demo states.
 
 ## Commands
 
@@ -43,6 +43,14 @@ npm run validate
 - `/?tab=home`, `/?tab=chat`, `/?tab=wallets`, or `/?tab=activity` opens a tab.
 - `/?view=strategy` opens the strategy editor.
 - `/#onboarding` opens onboarding.
+
+## Trading strategy demo
+
+Choose a strategy manually or use **Choose randomly with Quantis**. This is a local simulation: no Quantis device is connected. Each of the four strategies has a 25% chance on every draw, including the current choice. Random selection only changes the editor draft.
+
+**Save strategy** keeps the selection, each strategy's parameters, and shared purchase limits for the current session. Leaving the editor discards unsaved changes. Pause and Resume apply to the saved strategy without saving the draft. Saving keeps the current operating mode.
+
+**Remove strategy** discards unsaved changes and removes the saved selection, while retaining saved parameters and limits. After saving a new strategy, use **Resume strategy** to enable demo monitoring. Restarting onboarding preserves the saved configuration and operating mode; reloading resets the entire session.
 
 ## Development
 

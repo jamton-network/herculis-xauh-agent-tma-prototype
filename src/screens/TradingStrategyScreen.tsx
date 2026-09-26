@@ -6,33 +6,45 @@ import {
   PauseIcon,
   ResumeIcon,
 } from "@radix-ui/react-icons";
-import type { AgentMode, StrategyId, StrategyDraft, SharedStrategyLimits } from "../types";
-import { strategyTemplates, initialStrategyDrafts } from "../demo/fixtures";
+import type {
+  AgentMode,
+  StrategyDraft,
+  StrategyConfiguration,
+  StrategyEditorDraft,
+} from "../types";
+import { strategyTemplates } from "../demo/fixtures";
+import { chooseDemoStrategy } from "../demo/strategyRandom";
 import { IconTile } from "../components/IconTile";
 import { AquaAttribution } from "../components/AquaAttribution";
+import { QuantisStrategyChooser } from "../components/QuantisStrategyChooser";
 
 export function TradingStrategyScreen({
   agentMode,
+  savedConfiguration,
   onBack,
   onSave,
   onPause,
   onRemove,
 }: {
   agentMode: AgentMode;
+  savedConfiguration: StrategyConfiguration;
   onBack: () => void;
-  onSave: () => void;
+  onSave: (configuration: StrategyEditorDraft) => void;
   onPause: () => void;
   onRemove: () => void;
 }) {
-  const [selectedStrategy, setSelectedStrategy] = useState<StrategyId>("target-price");
-  const [drafts, setDrafts] = useState<Record<StrategyId, StrategyDraft>>(initialStrategyDrafts);
-  const [limits, setLimits] = useState<SharedStrategyLimits>({
-    purchase: "250",
-    daily: "500",
-    monthly: "2000",
-    reserve: "200",
-    markup: "0.8",
-  });
+  const [draft, setDraft] = useState<StrategyEditorDraft>(() => ({
+    ...structuredClone(savedConfiguration),
+    selectedStrategy: savedConfiguration.selectedStrategy ?? "target-price",
+  }));
+  const [randomResult, setRandomResult] = useState("");
+  const [drawNumber, setDrawNumber] = useState(0);
+  const { selectedStrategy, drafts, limits } = draft;
+  const savedTemplate = strategyTemplates.find(
+    (template) => template.id === savedConfiguration.selectedStrategy,
+  );
+  const hasChanges = JSON.stringify(draft) !== JSON.stringify(savedConfiguration);
+  const isMonitoring = Boolean(savedTemplate) && agentMode === "monitoring";
   const sharedFields = [
     ["purchase", "Maximum per purchase", "USDT"],
     ["daily", "Daily budget", "USDT"],
@@ -42,10 +54,27 @@ export function TradingStrategyScreen({
   ] as const;
   const selectedDraft = drafts[selectedStrategy];
   const updateDraft = (key: keyof StrategyDraft, value: string) => {
-    setDrafts((current) => ({
+    setDraft((current) => ({
       ...current,
-      [selectedStrategy]: { ...current[selectedStrategy], [key]: value },
+      drafts: {
+        ...current.drafts,
+        [selectedStrategy]: { ...current.drafts[selectedStrategy], [key]: value },
+      },
     }));
+  };
+  const chooseRandomly = () => {
+    try {
+      const nextStrategy = chooseDemoStrategy();
+      const title = strategyTemplates.find((template) => template.id === nextStrategy)!.title;
+      const nextDrawNumber = drawNumber + 1;
+      setDraft((current) => ({ ...current, selectedStrategy: nextStrategy }));
+      setDrawNumber(nextDrawNumber);
+      setRandomResult(
+        `Draw ${nextDrawNumber}: ${title}.${nextStrategy === selectedStrategy ? " Selected again." : ""}`,
+      );
+    } catch {
+      setRandomResult("Random choice is unavailable. Choose a strategy manually.");
+    }
   };
 
   const strategySettings = (() => {
@@ -149,46 +178,65 @@ export function TradingStrategyScreen({
           <AquaAttribution />
         </div>
       </div>
-      <section className={`mode-card ${agentMode === "paused" ? "is-paused" : ""}`}>
-        <IconTile tone={agentMode === "paused" ? "red" : "green"} size="large">
-          {agentMode === "paused" ? <PauseIcon /> : <CheckCircledIcon />}
+      <section className="mode-card" aria-label="Saved strategy status">
+        <IconTile tone={isMonitoring ? "green" : "red"} size="large">
+          {isMonitoring ? <CheckCircledIcon /> : <PauseIcon />}
         </IconTile>
         <div>
-          <h2>{agentMode === "paused" ? "Strategy is paused" : "Strategy is active"}</h2>
+          <h2>
+            {!savedTemplate
+              ? "No strategy saved"
+              : agentMode === "paused"
+                ? "Strategy is paused"
+                : agentMode === "insufficient"
+                  ? "Funding action needed"
+                  : "Strategy is active"}
+          </h2>
+          {savedTemplate ? (
+            <p className="saved-strategy-name">Saved: {savedTemplate.title}</p>
+          ) : null}
           <p>
-            The agent follows the selected strategy, while every purchase must pass your balance,
-            budget, timing, and price limits. The amount and payment fee both count toward the caps.
+            {savedTemplate
+              ? "Only saved settings apply to the agent. Every purchase must pass your balance, budget, timing, and price limits, including the payment fee."
+              : "Choose a strategy and save your settings, then resume when you are ready. Your saved parameters and purchase limits remain available."}
           </p>
         </div>
       </section>
       <section className="strategy-section" aria-labelledby="strategy-options-heading">
         <div className="strategy-section-heading">
           <h2 id="strategy-options-heading">Choose one strategy</h2>
-          <span>One active</span>
+          <span>One selected</span>
         </div>
+        <QuantisStrategyChooser result={randomResult} onChoose={chooseRandomly} />
         <div className="strategy-options" role="radiogroup" aria-label="Trading strategy">
           {strategyTemplates.map((template) => {
             const Icon = template.icon;
             const isSelected = selectedStrategy === template.id;
             return (
-              <button
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                className={isSelected ? "is-selected" : ""}
-                key={template.id}
-                onClick={() => setSelectedStrategy(template.id)}
-                data-testid={`strategy-${template.id}`}
-              >
+              <label className={isSelected ? "is-selected" : ""} key={template.id}>
+                <input
+                  type="radio"
+                  name="trading-strategy"
+                  className="strategy-radio"
+                  checked={isSelected}
+                  aria-label={template.title}
+                  aria-describedby={`strategy-description-${template.id}`}
+                  onClick={() => setRandomResult("")}
+                  onChange={() => {
+                    setDraft((current) => ({ ...current, selectedStrategy: template.id }));
+                    setRandomResult("");
+                  }}
+                  data-testid={`strategy-${template.id}`}
+                />
                 <IconTile tone={isSelected ? "gold" : "blue"}>
                   <Icon />
                 </IconTile>
-                <span>
+                <span className="strategy-option-copy">
                   <strong>{template.title}</strong>
-                  <small>{template.description}</small>
+                  <small id={`strategy-description-${template.id}`}>{template.description}</small>
                 </span>
                 {isSelected ? <em>Selected</em> : null}
-              </button>
+              </label>
             );
           })}
         </div>
@@ -212,7 +260,9 @@ export function TradingStrategyScreen({
                   inputMode="decimal"
                   aria-label={label}
                   value={limits[key]}
-                  onChange={(event) => setLimits({ ...limits, [key]: event.target.value })}
+                  onChange={(event) =>
+                    setDraft({ ...draft, limits: { ...limits, [key]: event.target.value } })
+                  }
                 />
                 <small>{unit}</small>
               </span>
@@ -229,14 +279,31 @@ export function TradingStrategyScreen({
         </p>
       </aside>
       <div className="strategy-actions">
-        <button type="button" className="button button--primary" onClick={onSave}>
+        <p className="strategy-save-state" role="status" aria-label="Strategy changes">
+          {hasChanges ? "Unsaved changes" : "All changes saved"}
+        </p>
+        <p className="section-help">
+          Changes apply only after Save. Leaving discards unsaved changes.
+          {savedTemplate ? " Pause, Resume and Remove apply to the saved strategy." : ""}
+        </p>
+        <button type="button" className="button button--primary" onClick={() => onSave(draft)}>
           <CheckCircledIcon /> Save strategy
         </button>
-        <button type="button" className="button button--danger" onClick={onPause}>
+        <button
+          type="button"
+          className="button button--danger"
+          onClick={onPause}
+          disabled={!savedTemplate}
+        >
           {agentMode === "paused" ? <ResumeIcon /> : <PauseIcon />}
           {agentMode === "paused" ? "Resume strategy" : "Pause strategy"}
         </button>
-        <button type="button" className="text-button text-button--danger" onClick={onRemove}>
+        <button
+          type="button"
+          className="text-button text-button--danger"
+          onClick={onRemove}
+          disabled={!savedTemplate}
+        >
           Remove strategy
         </button>
       </div>

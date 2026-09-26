@@ -8,13 +8,15 @@ import {
   PauseIcon,
   RocketIcon,
 } from "@radix-ui/react-icons";
-import type { TabId, AgentMode, ActivityItem } from "../types";
+import type { TabId, AgentMode, ActivityItem, SharedStrategyLimits } from "../types";
 import { activityItems, withdrawalAssets, formatWithdrawalAmount } from "../demo/fixtures";
 import { IconTile } from "../components/IconTile";
 import { AquaAttribution } from "../components/AquaAttribution";
 
 export function HomeScreen({
   agentMode,
+  savedStrategyTitle,
+  savedLimits,
   onOpenAgentState,
   onOpenStrategy,
   onChangeTab,
@@ -22,6 +24,8 @@ export function HomeScreen({
   onTopUp,
 }: {
   agentMode: AgentMode;
+  savedStrategyTitle?: string;
+  savedLimits: SharedStrategyLimits;
   onOpenAgentState: () => void;
   onOpenStrategy: () => void;
   onChangeTab: (tab: TabId) => void;
@@ -30,16 +34,20 @@ export function HomeScreen({
 }) {
   const isPaused = agentMode === "paused";
   const isInsufficient = agentMode === "insufficient";
-  const headline = isPaused
-    ? "Autonomous buying is paused"
-    : isInsufficient
-      ? "Funding is below reserve"
-      : "No purchase yet today";
-  const body = isPaused
-    ? "Your limits remain saved. Resume when you want the agent to monitor again."
-    : isInsufficient
-      ? "Add USDT on Ethereum or lower your reserve before purchases can continue."
-      : "The current quote exceeds your 0.8% price-markup limit. I’ll continue monitoring.";
+  const headline = !savedStrategyTitle
+    ? "No strategy saved"
+    : isPaused
+      ? "Autonomous buying is paused"
+      : isInsufficient
+        ? "Funding is below reserve"
+        : "No purchase yet today";
+  const body = !savedStrategyTitle
+    ? "Choose a strategy and save your settings, then resume when you are ready. Your saved parameters and purchase limits remain available."
+    : isPaused
+      ? "Your limits remain saved. Resume when you want the agent to monitor again."
+      : isInsufficient
+        ? "Add USDT on Ethereum or lower your reserve before purchases can continue."
+        : `The agent is monitoring ${savedStrategyTitle} with your saved purchase limits. Maximum price markup: ${savedLimits.markup}%.`;
 
   return (
     <main className="screen-content home-screen" aria-labelledby="home-heading">
@@ -55,11 +63,13 @@ export function HomeScreen({
             aria-hidden="true"
           />
           <span>
-            {isPaused
-              ? "Agent is paused"
-              : isInsufficient
-                ? "Funding action needed"
-                : "Agent is monitoring"}
+            {!savedStrategyTitle
+              ? "No saved strategy"
+              : isPaused
+                ? "Agent is paused"
+                : isInsufficient
+                  ? "Funding action needed"
+                  : "Agent is monitoring"}
           </span>
           <ChevronRightIcon />
         </button>
@@ -132,9 +142,10 @@ export function HomeScreen({
           className="button button--secondary"
           onClick={onOpenStrategy}
           data-testid="review-strategy"
+          data-strategy-entry
         >
           <FileTextIcon />
-          Trading strategy
+          {savedStrategyTitle ? "Trading strategy" : "Choose a trading strategy"}
         </button>
         <AquaAttribution />
       </section>

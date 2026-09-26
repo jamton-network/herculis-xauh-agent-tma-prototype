@@ -62,6 +62,14 @@ export type SharedStrategyLimits = {
   markup: string;
 };
 
+export type StrategyConfiguration = {
+  selectedStrategy: StrategyId | null;
+  drafts: Record<StrategyId, StrategyDraft>;
+  limits: SharedStrategyLimits;
+};
+
+export type StrategyEditorDraft = StrategyConfiguration & { selectedStrategy: StrategyId };
+
 export type ActivityItem = {
   id: string;
   title: string;

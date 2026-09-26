@@ -61,9 +61,7 @@ async function openWallets(page: Page) {
 
 async function connectWallet(page: Page) {
   await page.getByTestId("connect-wallet").click();
-  await expect(
-    page.getByRole("heading", { name: "Connect an external Ethereum wallet" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connect your Ethereum wallet" })).toBeVisible();
   await page.getByTestId("verify-wallet").click();
   await expect(page.getByText("Verified", { exact: true })).toBeVisible();
 }
@@ -120,12 +118,12 @@ test("wallet ownership states and a confirmed USDT top-up are interactive", asyn
   await openWallets(page);
   await page.getByTestId("connect-wallet").click();
   await expectOpaqueSheet(page);
-  await page.getByRole("button", { name: "Preview wrong network" }).click();
+  await page.getByRole("button", { name: "Wrong network" }).click();
   await expect(page.getByRole("heading", { name: "Ethereum Mainnet required" })).toBeVisible();
   await expect(
     page.getByText("Switch the wallet to Ethereum Mainnet and try again."),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Preview verification failure" }).click();
+  await page.getByRole("button", { name: "Verification failure" }).click();
   await expect(page.getByRole("heading", { name: "Wallet check failed" })).toBeVisible();
   await page.getByTestId("verify-wallet").click();
 
@@ -152,14 +150,14 @@ test("ETH top-up credits only after confirmation and recovers from rejection or 
   await page.getByRole("button", { name: "ETH", exact: true }).click();
   await expect(page.getByLabel("Top-up amount")).toHaveValue("0.5");
   await page.getByTestId("review-top-up").click();
-  await page.getByRole("button", { name: "Preview rejection" }).click();
+  await page.getByRole("button", { name: "Rejection" }).click();
   await expect(page.getByRole("heading", { name: "Request rejected" })).toBeVisible();
   await expect(page.getByText("No transfer was signed or broadcast.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toHaveCount(0);
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByText("Ethereum Mainnet", { exact: true })).toBeVisible();
   await page.getByTestId("review-top-up").click();
-  await page.getByRole("button", { name: "Preview failed submission" }).click();
+  await page.getByRole("button", { name: "Failed submission" }).click();
   await expect(page.getByRole("heading", { name: "Submission failed" })).toBeVisible();
   await expect(page.getByText(/No credit was recorded/)).toBeVisible();
   await page.getByRole("button", { name: "Try again" }).click();
@@ -167,7 +165,7 @@ test("ETH top-up credits only after confirmation and recovers from rejection or 
   await page.getByTestId("confirm-top-up").click();
   await expect(page.getByRole("heading", { name: "Top-up submitted" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Simulate Ethereum confirmation" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "0.5 ETH credited" })).toBeVisible();
 });
 
@@ -244,14 +242,14 @@ test("withdrawal fee, stale-preview, failure, and unclear states remain recovera
   await connectWallet(page);
   await page.getByTestId("withdraw-wallet").click();
 
-  await page.getByRole("button", { name: "Preview changed fee" }).click();
+  await page.getByRole("button", { name: "Changed fee" }).click();
   await expect(page.getByRole("heading", { name: "Review required" })).toBeVisible();
   await expect(page.getByText("Nothing was sent.", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Review updated amount" }).click();
 
   await page.getByTestId("review-withdrawal").click();
   await page.getByTestId("confirm-withdrawal").click();
-  await page.getByRole("button", { name: "Preview failure" }).click();
+  await page.getByRole("button", { name: "Failure" }).click();
   await expect(page.getByRole("heading", { name: "Withdrawal failed" })).toBeVisible();
   await expect(page.getByText(/No asset was delivered/)).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
@@ -259,7 +257,7 @@ test("withdrawal fee, stale-preview, failure, and unclear states remain recovera
   await page.getByTestId("withdraw-wallet").click();
   await page.getByTestId("review-withdrawal").click();
   await page.getByTestId("confirm-withdrawal").click();
-  await page.getByRole("button", { name: "Preview unclear result" }).click();
+  await page.getByRole("button", { name: "Unclear result" }).click();
   await expect(page.getByRole("heading", { name: "Withdrawal needs review" })).toBeVisible();
   await expect(page.getByText(/will not retry/)).toBeVisible();
 });
@@ -272,7 +270,7 @@ test("full token withdrawal is blocked when the agent wallet cannot pay ETH fees
   await page.getByTestId("withdraw-wallet").click();
   await page.getByRole("button", { name: "USDT", exact: true }).click();
   await page.getByTestId("withdrawal-max").click();
-  await page.getByRole("button", { name: "Preview insufficient ETH" }).click();
+  await page.getByRole("button", { name: "Insufficient ETH" }).click();
   await expect(page.getByRole("heading", { name: "ETH balance is too low" })).toBeVisible();
   await page.getByRole("button", { name: "Top up ETH" }).click();
   await expect(page.getByRole("heading", { name: "Top up agent wallet" })).toBeVisible();
@@ -302,7 +300,7 @@ test("four trading strategies preserve drafts and support save, pause, resume, a
 }) => {
   await page.getByTestId("review-strategy").click();
   await expect(page.getByRole("heading", { name: "Trading strategy" })).toBeVisible();
-  await expect(page.getByTestId("strategy-target-price")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("strategy-target-price")).toBeChecked();
   await expect(page.getByLabel("Purchase amount")).toHaveValue("50");
   await expect(page.getByLabel("Buy at or below")).toHaveValue("130");
   await expect(page.getByText("24 hours", { exact: true })).toBeVisible();
@@ -336,7 +334,7 @@ test("four trading strategies preserve drafts and support save, pause, resume, a
   await page.getByRole("button", { name: "Remove strategy" }).click();
   await expectOpaqueSheet(page);
   await page.getByRole("button", { name: "Remove strategy", exact: true }).last().click();
-  await expect(page.getByRole("heading", { name: "Autonomous buying is paused" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No strategy saved" })).toBeVisible();
 });
 
 test("activity separates purchases and transfers and preserves delivery pending", async ({
@@ -400,7 +398,7 @@ test("wallets copy synthetic addresses and show equal top-up controls", async ({
     tabs.nth(1).boundingBox(),
   ]);
   expect(Math.abs((usdtBox?.width ?? 0) - (ethBox?.width ?? 0))).toBeLessThanOrEqual(1);
-  await expect(page.getByText(`Demo wallet · ${externalValue}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`External wallet · ${externalValue}`, { exact: true })).toBeVisible();
   await expect(page.getByText(`Agent wallet · ${agentValue}`, { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByTestId("withdraw-wallet").click();
@@ -522,9 +520,7 @@ test("Ethereum onboarding connection persists and disconnect restores transfer g
   await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
   for (const action of ["top-up-wallet", "withdraw-wallet"]) {
     await page.getByTestId(action).click();
-    await expect(page.getByRole("dialog")).toHaveAccessibleName(
-      "Connect an external Ethereum wallet",
-    );
+    await expect(page.getByRole("dialog")).toHaveAccessibleName("Connect your Ethereum wallet");
     await page.keyboard.press("Escape");
   }
   await connectWallet(page);

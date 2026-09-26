@@ -6,13 +6,13 @@ export function BrandHeader({ onOpenSettings }: { onOpenSettings: () => void }) 
       <img src="/assets/xauh-coin.png" alt="" className="brand-coin" draggable={false} />
       <div className="brand-title-wrap">
         <p className="brand-title">Herculis XAUH Agent</p>
-        <p className="brand-subtitle">Interactive demo · No real transactions</p>
+        <p className="brand-subtitle">Your XAUH portfolio assistant</p>
       </div>
       <button
         className="icon-button brand-settings-button"
         type="button"
         onClick={onOpenSettings}
-        aria-label="Open demo settings"
+        aria-label="Open settings"
         aria-haspopup="dialog"
         data-testid="settings-trigger"
       >

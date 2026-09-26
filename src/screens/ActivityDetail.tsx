@@ -41,7 +41,7 @@ export function ActivityDetail({ item }: { item: ActivityItem }) {
       <dl className="detail-list">
         <div>
           <dt>{isPurchase ? "Purchase" : isTopUp ? "Top-up" : "Withdrawal"}</dt>
-          <dd>{item.id}</dd>
+          <dd>{item.id.replace(/^DEMO-/, "")}</dd>
         </div>
         <div>
           <dt>Amount</dt>
@@ -122,7 +122,7 @@ export function ActivityDetail({ item }: { item: ActivityItem }) {
       </ol>
       {(completed || pending) && (
         <p className="mock-note">
-          <InfoCircledIcon /> Explorer links are unavailable for simulated transactions.
+          <InfoCircledIcon /> Explorer link unavailable.
         </p>
       )}
     </div>

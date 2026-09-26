@@ -14,6 +14,7 @@ import type {
   WithdrawalAsset,
   StrategyId,
   StrategyDraft,
+  StrategyConfiguration,
   ActivityItem,
 } from "../types";
 
@@ -85,6 +86,18 @@ export const initialStrategyDrafts: Record<StrategyId, StrategyDraft> = {
     reserve: "200",
     dipPercent: "2",
     lookbackDays: "7",
+  },
+};
+
+export const initialStrategyConfiguration: StrategyConfiguration = {
+  selectedStrategy: "target-price",
+  drafts: initialStrategyDrafts,
+  limits: {
+    purchase: "250",
+    daily: "500",
+    monthly: "2000",
+    reserve: "200",
+    markup: "0.8",
   },
 };
 

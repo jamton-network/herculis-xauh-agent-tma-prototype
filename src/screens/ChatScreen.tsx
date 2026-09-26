@@ -28,7 +28,7 @@ export function ChatScreen({
       {
         id: `a-${Date.now()}`,
         from: "agent",
-        text: "This is a simulated reply. Try editing a trading strategy or exploring the wallet flows. No message is sent to a bot or a live model.",
+        text: "You can review your trading strategy, adjust purchase limits, or open Wallets to manage your balances.",
         time: "Now",
       },
     ]);
@@ -42,13 +42,14 @@ export function ChatScreen({
         <main className="screen-content chat-screen" aria-labelledby="chat-heading">
           <div className="screen-heading">
             <div>
-              <p className="eyebrow">Demo conversation</p>
+              <p className="eyebrow">Your portfolio assistant</p>
               <h1 id="chat-heading">Agent chat</h1>
             </div>
             <button
               type="button"
               className="icon-button"
               aria-label="Open trading strategy"
+              data-strategy-entry
               onClick={onOpenStrategy}
             >
               <FileTextIcon />

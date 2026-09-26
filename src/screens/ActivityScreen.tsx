@@ -75,7 +75,7 @@ export function ActivityScreen({
         </section>
       ) : (
         <section className="activity-list" aria-label="Wallet and purchase activity">
-          <p className="list-caption">Demo activity</p>
+          <p className="list-caption">Recent activity</p>
           {filteredItems.map((item, index) => (
             <button
               type="button"

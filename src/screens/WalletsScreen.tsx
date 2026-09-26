@@ -114,7 +114,7 @@ export function WalletsScreen({
         </div>
         {isConnected ? (
           <>
-            <p className="connected-wallet-name">Demo wallet</p>
+            <p className="connected-wallet-name">External wallet</p>
             <button
               type="button"
               className="address-box"
