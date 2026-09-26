@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["unicorn", "typescript", "oxc", "react"],
+  "categories": { "correctness": "error" },
+  "rules": { "react/rules-of-hooks": "error", "react/exhaustive-deps": "error" },
+  "ignorePatterns": [
+    "dist/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    ".husky/_/**"
+  ]
+}
