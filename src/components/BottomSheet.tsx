@@ -7,6 +7,7 @@ type BottomSheetProps = PropsWithChildren<{
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  scrollDescription?: boolean;
 }>;
 
 export function BottomSheet({
@@ -14,10 +15,16 @@ export function BottomSheet({
   onOpenChange,
   title,
   description,
+  scrollDescription = false,
   children,
 }: BottomSheetProps) {
   const descriptionId = useId();
   const opener = useRef<HTMLElement | null>(null);
+  const descriptionContent = description ? (
+    <Dialog.Description id={descriptionId} className="sheet-description">
+      {description}
+    </Dialog.Description>
+  ) : null;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -38,16 +45,15 @@ export function BottomSheet({
         >
           <div className="sheet-header">
             <Dialog.Title className="sheet-title">{title}</Dialog.Title>
-            {description ? (
-              <Dialog.Description id={descriptionId} className="sheet-description">
-                {description}
-              </Dialog.Description>
-            ) : null}
+            {scrollDescription ? null : descriptionContent}
             <Dialog.Close className="sheet-close" aria-label="Dismiss dialog">
               <Cross2Icon width={20} height={20} />
             </Dialog.Close>
           </div>
-          <div className="sheet-content">{children}</div>
+          <div className="sheet-content">
+            {scrollDescription ? descriptionContent : null}
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

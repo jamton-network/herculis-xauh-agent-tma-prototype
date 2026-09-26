@@ -1,6 +1,66 @@
 import { expect, test } from "@playwright/test";
 
 for (const theme of ["light", "dark"]) {
+  test(`${theme} Quantis information remains readable and scrollable at narrow widths and with enlarged text`, async ({
+    page,
+  }) => {
+    const viewports = [320, 375, 430, 768, 1440].map((width) => ({
+      width,
+      height: 844,
+      textScale: 1,
+    }));
+    viewports.push(
+      { width: 320, height: 480, textScale: 1 },
+      { width: 320, height: 480, textScale: 2 },
+    );
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const { width, height, textScale } of viewports) {
+      await page.setViewportSize({ width, height });
+      await page.goto(`/?theme=${theme}&view=strategy`);
+      const about = page.getByRole("button", { name: "About Quantis" });
+      await about.click();
+      const dialog = page.getByRole("dialog", { name: "About Quantis" });
+      if (textScale > 1) {
+        await dialog.evaluate((element, scale) => {
+          const sizes = [...element.querySelectorAll<HTMLElement>("*")].map(
+            (child) => [child, parseFloat(getComputedStyle(child).fontSize)] as const,
+          );
+          for (const [child, size] of sizes) child.style.fontSize = `${size * scale}px`;
+        }, textScale);
+      }
+      const layout = await dialog.evaluate((element) => {
+        const content = element.querySelector<HTMLElement>(".sheet-content")!;
+        const bounds = element.getBoundingClientRect();
+        const contentBounds = content.getBoundingClientRect();
+        return {
+          top: bounds.top,
+          bottom: bounds.bottom,
+          contentHeight: contentBounds.height,
+          contentBottom: contentBounds.bottom,
+          overflow: Math.max(
+            element.scrollWidth - element.clientWidth,
+            content.scrollWidth - content.clientWidth,
+          ),
+        };
+      });
+      expect(layout.top).toBeGreaterThanOrEqual(0);
+      expect(layout.bottom).toBeLessThanOrEqual(height);
+      expect(layout.contentHeight).toBeGreaterThan(120);
+      expect(layout.contentBottom).toBeLessThanOrEqual(height);
+      expect(layout.overflow).toBeLessThanOrEqual(1);
+      const overview = dialog.getByRole("link", { name: /About quantum random number generation/ });
+      await overview.focus();
+      const linkBounds = (await overview.boundingBox())!;
+      expect(linkBounds.y).toBeGreaterThanOrEqual(layout.top);
+      expect(linkBounds.y + linkBounds.height).toBeLessThanOrEqual(height);
+      await expect(dialog.getByRole("button", { name: "Dismiss dialog" })).toBeInViewport();
+      await page.keyboard.press("Escape");
+      await expect(about).toBeFocused();
+    }
+  });
+}
+
+for (const theme of ["light", "dark"]) {
   test(`${theme} screens fill the browser and remain usable across viewport sizes`, async ({
     page,
   }) => {
@@ -106,6 +166,7 @@ test("native chat input and scroll stay usable when the visible viewport shrinks
 test("dialogs provide descriptions, trap focus, and restore focus after dismissal", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 320, height: 480 });
   await page.goto("/");
   const trigger = page.getByRole("button", { name: "Open settings" });
   const dialog = page.getByRole("dialog");
@@ -119,6 +180,14 @@ test("dialogs provide descriptions, trap focus, and restore focus after dismissa
   await expect(dialog).toHaveAccessibleDescription(
     "Customize your experience and explore app states.",
   );
+  await dialog.locator(".sheet-content").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(dialog.getByRole("heading", { name: "Settings" })).toBeInViewport();
+  await expect(
+    dialog.getByText("Customize your experience and explore app states."),
+  ).toBeInViewport();
+  await expect(dialog.getByRole("button", { name: "Dismiss dialog" })).toBeInViewport();
   for (let index = 0; index < 14; index++) {
     await page.keyboard.press("Tab");
     expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);

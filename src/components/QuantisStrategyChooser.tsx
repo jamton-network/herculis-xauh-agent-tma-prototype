@@ -1,4 +1,6 @@
-import { ShuffleIcon } from "@radix-ui/react-icons";
+import { useState } from "react";
+import { InfoCircledIcon, ShuffleIcon } from "@radix-ui/react-icons";
+import { QuantisInfoSheet } from "./QuantisInfoSheet";
 
 export function QuantisStrategyChooser({
   result,
@@ -7,9 +9,21 @@ export function QuantisStrategyChooser({
   result: string;
   onChoose: () => void;
 }) {
+  const [aboutOpen, setAboutOpen] = useState(false);
   return (
     <section className="quantis-chooser" aria-labelledby="quantis-heading">
-      <h3 id="quantis-heading">Quantis</h3>
+      <div className="quantis-heading">
+        <h3 id="quantis-heading">Quantis</h3>
+        <button
+          type="button"
+          className="quantis-about"
+          aria-haspopup="dialog"
+          onClick={() => setAboutOpen(true)}
+        >
+          <InfoCircledIcon aria-hidden="true" />
+          About Quantis
+        </button>
+      </div>
       <p id="quantis-description">Explore a strategy picked at random.</p>
       <button
         type="button"
@@ -31,6 +45,7 @@ export function QuantisStrategyChooser({
       >
         {result}
       </p>
+      <QuantisInfoSheet open={aboutOpen} onOpenChange={setAboutOpen} />
     </section>
   );
 }

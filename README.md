@@ -64,4 +64,4 @@ GitHub Actions validates pull requests targeting `main` and pushes to `main`. Su
 
 ## License
 
-Project code and included project assets are available under the [MIT license](LICENSE). Dependencies retain their respective licenses. The project name and branding do not imply endorsement of derivatives.
+Project code and included project assets, except the [Quantis device photograph](public/assets/quantis-device.webp), are available under the [MIT license](LICENSE). The Quantis photograph is provided for use in this application and is excluded from the project's MIT license. Rights to the photograph and the depicted branding remain with their respective rights holders. Dependencies retain their respective licenses. The project name and branding do not imply endorsement of derivatives.

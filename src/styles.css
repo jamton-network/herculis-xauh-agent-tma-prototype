@@ -1480,6 +1480,88 @@ img {
   font-size: 14px;
 }
 
+.quantis-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.quantis-about {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tg-link);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.quantis-about svg,
+.quantis-info-links svg {
+  flex: 0 0 16px;
+}
+
+.quantis-info {
+  display: grid;
+  gap: 20px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.quantis-info figure {
+  margin: 0;
+}
+
+.quantis-info img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--tg-separator);
+  border-radius: 12px;
+}
+
+.quantis-info figcaption {
+  margin-top: 8px;
+  color: var(--tg-text-secondary);
+  font-size: 0.75rem;
+}
+
+.quantis-info-copy h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.quantis-info-copy p {
+  margin: 8px 0 0;
+}
+
+.quantis-info-links {
+  display: grid;
+  gap: 4px;
+}
+
+.quantis-info-links a {
+  display: flex;
+  min-height: 44px;
+  padding: 8px 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 4px;
+  color: var(--tg-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
 .quantis-chooser p {
   margin: 8px 0;
   color: var(--tg-text-secondary);
@@ -1739,6 +1821,10 @@ img {
   padding: 0 24px calc(24px + env(safe-area-inset-bottom));
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.sheet-content > .sheet-description {
+  margin: 0 0 20px;
 }
 
 .settings-list,
