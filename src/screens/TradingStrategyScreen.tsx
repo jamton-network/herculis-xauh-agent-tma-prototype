@@ -9,6 +9,7 @@ import {
 import type { AgentMode, StrategyId, StrategyDraft, SharedStrategyLimits } from "../types";
 import { strategyTemplates, initialStrategyDrafts } from "../demo/fixtures";
 import { IconTile } from "../components/IconTile";
+import { AquaAttribution } from "../components/AquaAttribution";
 
 export function TradingStrategyScreen({
   agentMode,
@@ -143,7 +144,10 @@ export function TradingStrategyScreen({
           <ChevronLeftIcon />
           <span>Back</span>
         </button>
-        <h1 id="strategy-heading">Trading strategy</h1>
+        <div className="strategy-title">
+          <h1 id="strategy-heading">Trading strategy</h1>
+          <AquaAttribution />
+        </div>
       </div>
       <section className={`mode-card ${agentMode === "paused" ? "is-paused" : ""}`}>
         <IconTile tone={agentMode === "paused" ? "red" : "green"} size="large">

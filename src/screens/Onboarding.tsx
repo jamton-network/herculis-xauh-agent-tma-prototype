@@ -8,6 +8,7 @@ import {
   PersonIcon,
 } from "@radix-ui/react-icons";
 import { IconTile } from "../components/IconTile";
+import { AquaAttribution } from "../components/AquaAttribution";
 
 export function Onboarding({
   onComplete,
@@ -82,6 +83,7 @@ export function Onboarding({
         <p className="eyebrow">{item.eyebrow}</p>
         <h1 id="onboarding-heading">{item.title}</h1>
         <p className="onboarding-copy">{item.copy}</p>
+        {step === 3 ? <AquaAttribution /> : null}
         <ul>
           {item.details.map((detail) => (
             <li key={detail}>

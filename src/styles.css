@@ -439,6 +439,22 @@ img {
   padding: 10px 0 12px;
 }
 
+.aqua-attribution {
+  margin: 0;
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.aqua-attribution strong {
+  color: var(--tg-text);
+  font-weight: 650;
+}
+
+.home-actions .aqua-attribution {
+  text-align: center;
+}
+
 .button {
   display: inline-flex;
   width: 100%;
@@ -1262,6 +1278,14 @@ img {
   gap: 12px;
 }
 
+.strategy-title {
+  min-width: 0;
+}
+
+.strategy-title .aqua-attribution {
+  margin-top: 4px;
+}
+
 .mode-card {
   display: grid;
   grid-template-columns: 74px 1fr;
@@ -1544,6 +1568,10 @@ img {
   color: var(--tg-text-secondary);
   font-size: 14px;
   line-height: 1.55;
+}
+
+.onboarding-body .aqua-attribution {
+  margin-bottom: 22px;
 }
 
 .onboarding-body ul {

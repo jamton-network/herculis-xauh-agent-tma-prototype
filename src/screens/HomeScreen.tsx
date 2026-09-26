@@ -11,6 +11,7 @@ import {
 import type { TabId, AgentMode, ActivityItem } from "../types";
 import { activityItems, withdrawalAssets, formatWithdrawalAmount } from "../demo/fixtures";
 import { IconTile } from "../components/IconTile";
+import { AquaAttribution } from "../components/AquaAttribution";
 
 export function HomeScreen({
   agentMode,
@@ -135,6 +136,7 @@ export function HomeScreen({
           <FileTextIcon />
           Trading strategy
         </button>
+        <AquaAttribution />
       </section>
 
       <section className="latest-activity" aria-labelledby="latest-activity-heading">
