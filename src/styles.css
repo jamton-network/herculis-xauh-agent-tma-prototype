@@ -1351,6 +1351,893 @@ img {
   padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
 
+.liquidity-screen {
+  max-width: 1120px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  overflow-wrap: anywhere;
+}
+
+.liquidity-wallet-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin: 28px 0 24px;
+  font-size: 13px;
+}
+
+.liquidity-network,
+.liquidity-wallet-balances,
+.liquidity-wallet-balances > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.liquidity-wallet-balances {
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.liquidity-wallet-menu {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.liquidity-wallet-menu > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 24px;
+  background: var(--tg-bg);
+  list-style: none;
+  cursor: pointer;
+}
+
+.liquidity-wallet-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.liquidity-wallet-menu > summary > span {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-menu-trigger-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--tg-link);
+}
+
+.wallet-menu-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--tg-text-secondary);
+  transition: transform 160ms ease;
+}
+
+.liquidity-wallet-menu[open] > summary {
+  border-color: var(--tg-link);
+  background: var(--tg-surface);
+}
+
+.liquidity-wallet-menu[open] .wallet-menu-chevron {
+  transform: rotate(180deg);
+}
+
+.wallet-menu-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  padding: 18px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 20px;
+  background: var(--tg-bg);
+  box-shadow: var(--shadow);
+}
+
+.wallet-menu-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.wallet-menu-avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--tg-surface-strong);
+  color: var(--tg-link);
+}
+
+.wallet-menu-avatar svg {
+  width: 20px;
+  height: 20px;
+}
+
+.wallet-menu-heading strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wallet-menu-connection {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+}
+
+.wallet-menu-connection > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.wallet-menu-network {
+  margin-left: auto;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--tg-surface);
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+}
+
+.wallet-menu-network.is-warning {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.wallet-menu-address-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 12px;
+  background: var(--tg-surface);
+}
+
+.wallet-menu-address {
+  flex: 1;
+  min-width: 0;
+  font:
+    12px/1.7 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.wallet-menu-copy {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tg-separator);
+  border-radius: 10px;
+  background: var(--tg-bg);
+  color: var(--tg-text-secondary);
+}
+
+.wallet-menu-copy svg {
+  width: 16px;
+  height: 16px;
+}
+
+.wallet-menu-copy.is-copied {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.wallet-menu-copy-status {
+  margin: 8px 0 0;
+  color: var(--green);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.wallet-menu-copy-status:empty {
+  display: none;
+}
+
+.wallet-menu-copy-status.is-error {
+  color: var(--tg-text-secondary);
+}
+
+.wallet-menu-balance {
+  margin: 18px 0 16px;
+}
+
+.wallet-menu-balance > span {
+  color: var(--tg-text-secondary);
+  font-size: 12px;
+}
+
+.wallet-menu-balance > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-menu-balance strong {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.wallet-menu-balance > div > span {
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+}
+
+.wallet-menu-actions {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.wallet-menu-actions > button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tg-text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.wallet-menu-actions svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--tg-text-secondary);
+}
+
+.app-shell .wallet-menu-actions .wallet-menu-disconnect,
+.wallet-menu-disconnect svg {
+  color: var(--red);
+}
+
+.wallet-menu-actions > button:disabled {
+  opacity: 0.5;
+}
+
+@media (hover: hover) {
+  .wallet-menu-copy:hover,
+  .wallet-menu-actions > button:hover:not(:disabled) {
+    background: var(--tg-surface-strong);
+  }
+
+  .wallet-menu-actions > .wallet-menu-disconnect:hover:not(:disabled) {
+    background: var(--red-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-menu-chevron {
+    transition: none;
+  }
+}
+
+.liquidity-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.liquidity-main-card {
+  padding: 28px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 24px;
+  background: var(--tg-surface);
+}
+
+.liquidity-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.liquidity-screen h2,
+.liquidity-screen h3 {
+  margin: 0;
+}
+
+.liquidity-screen h2 {
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+
+.liquidity-screen h3 {
+  font-size: 16px;
+}
+
+.liquidity-muted,
+.liquidity-wallet-note,
+.liquidity-confirm-note {
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.liquidity-editor > .liquidity-muted,
+.liquidity-review > .liquidity-muted {
+  margin: 8px 0 24px;
+}
+
+.liquidity-range-picker {
+  min-width: 0;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+}
+
+.liquidity-range-picker legend,
+.liquidity-field-heading {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.liquidity-segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 14px;
+}
+
+.liquidity-segmented label {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 8px;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--tg-text-secondary);
+  cursor: pointer;
+}
+
+.liquidity-segmented label.is-selected {
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  box-shadow: 0 1px 4px #00000012;
+}
+
+.liquidity-segmented input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.liquidity-segmented label:has(input:focus-visible) {
+  outline: 3px solid var(--tg-link);
+  outline-offset: 2px;
+}
+
+.liquidity-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.liquidity-range-inputs {
+  margin-bottom: 24px;
+}
+
+.liquidity-range-inputs label,
+.liquidity-fee-editor label {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.liquidity-range-inputs input,
+.liquidity-fee-editor input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 10px;
+  background: var(--tg-bg);
+  color: var(--tg-text);
+}
+
+.liquidity-range-inputs small {
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+}
+
+.liquidity-amounts {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.liquidity-amount-card {
+  display: block;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 16px;
+  background: var(--tg-bg);
+}
+
+.liquidity-amount-top,
+.liquidity-amount-top > span {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.liquidity-amount-top {
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.liquidity-amount-top small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--tg-text-secondary);
+}
+
+.liquidity-token-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.liquidity-token-mark--usdt {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.liquidity-wallet-balances .liquidity-token-mark {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.liquidity-amount-card input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--tg-text);
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .liquidity-screen button:focus-visible,
+.app-shell .liquidity-screen input:focus-visible {
+  outline-color: var(--tg-link) !important;
+}
+
+.liquidity-amount-card:focus-within {
+  outline: 3px solid var(--tg-link);
+  outline-offset: 2px;
+}
+
+.app-shell .liquidity-amount-card input:focus-visible {
+  outline: none !important;
+}
+
+.liquidity-summary-row,
+.liquidity-fee-editor summary,
+.liquidity-review-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 0;
+  font-size: 13px;
+}
+
+.liquidity-summary-row > span,
+.liquidity-fee-editor summary > span,
+.liquidity-review-facts dt {
+  color: var(--tg-text-secondary);
+}
+
+.liquidity-summary-row output {
+  font-weight: 600;
+}
+
+.liquidity-fee-editor summary {
+  border-top: 1px solid var(--tg-separator);
+  cursor: pointer;
+}
+
+.liquidity-fee-editor summary strong::after {
+  content: "⌄";
+  margin-left: 10px;
+  color: var(--tg-text-secondary);
+}
+
+.liquidity-wallet-note {
+  margin: 12px 0 20px;
+}
+
+.liquidity-primary {
+  width: 100%;
+  height: auto;
+  min-height: 50px;
+  margin-top: 12px;
+  white-space: normal;
+}
+
+.liquidity-confirm-note {
+  margin: 10px 0 0;
+  text-align: center;
+}
+
+.liquidity-positions-panel > .liquidity-card-heading {
+  margin: 0 0 16px;
+}
+
+.liquidity-positions-panel h2 {
+  font-size: 18px;
+}
+
+.liquidity-positions-panel h2 > span {
+  padding-left: 6px;
+  color: var(--tg-text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.liquidity-refresh {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tg-separator);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tg-text-secondary);
+}
+
+.liquidity-refresh:disabled {
+  opacity: 0.5;
+}
+
+.liquidity-position-list {
+  display: grid;
+  gap: 16px;
+}
+
+.liquidity-position {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 20px;
+}
+
+.liquidity-position > .liquidity-muted {
+  margin: 8px 0 16px;
+}
+
+.liquidity-status {
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: var(--tg-surface);
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.liquidity-status--active {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.liquidity-range-caption {
+  margin: -4px 0 16px;
+  font-size: 12px;
+}
+
+.liquidity-allocation-label {
+  margin: 0 0 10px;
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+}
+
+.liquidity-allocation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.liquidity-allocation > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.liquidity-allocation strong,
+.liquidity-allocation small {
+  display: block;
+}
+
+.liquidity-allocation strong {
+  font-size: 17px;
+}
+
+.liquidity-allocation small {
+  margin-top: 4px;
+  color: var(--tg-text-secondary);
+  font-size: 11px;
+}
+
+.liquidity-position-actions {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.liquidity-position-actions .button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.liquidity-manage summary,
+.liquidity-position-details summary,
+.liquidity-advanced summary,
+.liquidity-utilities > summary {
+  min-height: 36px;
+  padding: 8px 0;
+  cursor: pointer;
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+}
+
+.liquidity-manage > div,
+.liquidity-secondary-actions {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.liquidity-position-details {
+  margin-top: 12px;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.liquidity-text-button {
+  min-height: 36px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--tg-link);
+  font-size: 13px;
+}
+
+.liquidity-text-button:disabled {
+  color: var(--tg-text-secondary);
+  opacity: 0.6;
+}
+
+.liquidity-order {
+  display: block;
+  width: 100%;
+  min-height: 90px;
+  margin: 8px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--tg-separator);
+  border-radius: 10px;
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  resize: vertical;
+  font: 12px monospace;
+}
+
+.liquidity-empty {
+  padding: 28px 20px;
+  border: 1px dashed var(--tg-separator);
+  border-radius: 20px;
+  color: var(--tg-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.liquidity-discovery-note {
+  margin-top: 16px;
+  color: var(--tg-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.liquidity-review-amounts {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.liquidity-review-amounts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.liquidity-review-amounts strong {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.liquidity-review-amounts > div > span:last-child {
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+}
+
+.liquidity-review-facts {
+  margin: 0;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.liquidity-review-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.liquidity-close-note {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.liquidity-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 24px 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--tg-text-secondary);
+}
+
+.liquidity-progress li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.liquidity-progress .is-current {
+  color: var(--tg-text);
+}
+
+.liquidity-progress .is-done {
+  color: var(--green);
+}
+
+.liquidity-success-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+  color: var(--green);
+}
+
+.liquidity-advanced {
+  margin-top: 20px;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.liquidity-pending {
+  margin-top: 20px;
+}
+
+.liquidity-pending h3 {
+  font-size: 17px;
+}
+
+.liquidity-error {
+  padding: 12px 16px;
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  background: var(--gold-soft);
+  color: var(--tg-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.liquidity-utilities {
+  margin-top: 24px;
+  border-top: 1px solid var(--tg-separator);
+}
+
+.liquidity-utilities > summary {
+  min-height: 48px;
+  padding: 16px 0;
+}
+
+.liquidity-utilities h3 {
+  margin: 20px 0 12px;
+}
+
+@media (max-width: 800px) {
+  .liquidity-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .liquidity-wallet-balances {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .liquidity-main-card,
+  .liquidity-position {
+    padding: 20px 16px;
+  }
+
+  .liquidity-screen h2 {
+    font-size: 20px;
+  }
+
+  .liquidity-review-amounts strong {
+    font-size: 21px;
+  }
+}
+
 .subscreen-header {
   justify-content: flex-start;
   gap: 12px;

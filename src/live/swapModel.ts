@@ -18,7 +18,14 @@ import {
   type TransactionReceipt,
 } from "viem";
 import type { ExecutionFamily } from "../types";
-import type { SwapConfig, SwapDirection, SwapOrder, SwapToken } from "./swapConfig";
+import {
+  parseSwapOrder,
+  type SwapConfig,
+  type SwapDirection,
+  type SwapOrder,
+  type SwapToken,
+} from "./swapConfig";
+import { liquidityReceiptSummary } from "./liquidityReceipt";
 
 export const registryAbi = AquaABI.AQUA_ABI;
 export const routerAbi = SwapABI.SWAP_VM_ABI;
@@ -47,7 +54,7 @@ export type SwapQuote = {
 export type SwapEstimate = { family: ExecutionFamily; quote?: SwapQuote; error?: string };
 export type SwapOperation = {
   id: Hex;
-  kind: "approval" | "swap";
+  kind: "approval" | "swap" | "initialize" | "ship" | "push" | "update-reserves" | "dock";
   account: Address;
   nonce: number;
   to: Address;
@@ -66,6 +73,11 @@ export type SwapOperation = {
   hash?: Hex;
   evidence?: string;
   feeRate?: { rate: string; parts: string };
+  workflowId?: Hex;
+  stepId?: string;
+  order?: Hex;
+  actualFee?: string;
+  receiptBlockHash?: Hex;
 };
 export const isUnresolved = (operation: SwapOperation) =>
   ["awaiting-wallet", "ambiguous", "pending", "needs-review"].includes(operation.status);
@@ -159,6 +171,7 @@ export function receiptSummary(
   receipt: TransactionReceipt,
 ): string {
   if (receipt.status !== "success") throw new Error("Transaction reverted.");
+  if (operation.workflowId) return liquidityReceiptSummary(config, operation, receipt);
   const transfers = receipt.logs.flatMap((log) => {
     try {
       return [{ address: log.address, event: decodeEventLog({ abi: erc20Abi, ...log }) }];
@@ -193,9 +206,7 @@ export function receiptSummary(
   if (decoded.functionName !== "swap") throw new Error("Unexpected swap payload.");
   const [order, tokenIn, tokenOut, amount, packed] = decoded.args;
   const traits = TakerTraits.decode(new HexString(packed));
-  const strategy = config.orders.find(
-    (item) => item.encoded === encodeAbiParameters([Order.ABI], [order]),
-  );
+  const strategy = parseSwapOrder(encodeAbiParameters([Order.ABI], [order]));
   if (!strategy || !sameAddress(operation.to, config.router))
     throw new Error("Unknown strategy identity.");
   const direction: SwapDirection = sameAddress(tokenIn, config.tokens.usdt)

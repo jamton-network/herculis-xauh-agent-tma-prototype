@@ -10,6 +10,7 @@ export type SwapOrder = {
   hash: Hex;
   maker: Address;
   feeUnits: bigint;
+  range?: { min: bigint; max: bigint };
 };
 export type SwapConfig = {
   chainId: 11155111;
@@ -19,6 +20,7 @@ export type SwapConfig = {
   tokens: Record<SwapToken, Address>;
   codeHashes: Record<"router" | "registry" | SwapToken, Hex>;
   orders: SwapOrder[];
+  deploymentBlock: bigint;
 };
 
 export const swapNetwork = { chainId: 11155111, explorer: "https://sepolia.etherscan.io" } as const;
@@ -59,18 +61,20 @@ export function parseSwapOrder(encoded: unknown): SwapOrder {
   )
     throw new Error("Unsupported liquidity pricing program.");
   const curveIndex = names.indexOf(allowed[0]);
-  const feeIndex = names.indexOf(allowed[2]);
-  const concentrateIndex = names.indexOf(allowed[1]);
-  if (
-    names.slice(curveIndex + 1).some((name) => name !== allowed[3]) ||
-    (feeIndex !== -1 && concentrateIndex !== -1 && feeIndex > concentrateIndex)
-  )
+  if (names.slice(curveIndex + 1).some((name) => name !== allowed[3]))
     throw new Error("Unsupported pricing instruction order.");
   let feeUnits = 0n;
+  let range: SwapOrder["range"];
   for (const ix of instructions) {
     if (String(ix.opcode.id) === allowed[2]) {
       const args = ix.args.toJSON();
       feeUnits += BigInt(String(args?.fee ?? "-1"));
+    }
+    if (String(ix.opcode.id) === allowed[1]) {
+      const args = ix.args.toJSON();
+      range = { min: BigInt(String(args?.sqrtPriceMin)), max: BigInt(String(args?.sqrtPriceMax)) };
+      if (range.min <= 0n || range.max <= range.min)
+        throw new Error("Invalid concentration range.");
     }
   }
   if (feeUnits < 0n || feeUnits > 1_000_000_000n) throw new Error("Unsupported swap fee.");
@@ -80,6 +84,7 @@ export function parseSwapOrder(encoded: unknown): SwapOrder {
     hash: keccak256(encoded as Hex),
     maker: getAddress(built.maker),
     feeUnits,
+    range,
   };
 }
 
@@ -128,6 +133,7 @@ export function parseSwapConfig(raw: unknown): SwapConfig {
     tokens: { xauh: getAddress(value.tokens.xauh), usdt: getAddress(value.tokens.usdt) },
     codeHashes: value.codeHashes,
     orders,
+    deploymentBlock: BigInt(value.deploymentBlock ?? 0),
   };
 }
 
