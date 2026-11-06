@@ -1,4 +1,4 @@
-import { installSwapConfig } from "./swap-wallet.cjs";
+import { config as swapConfig, installSwapConfig } from "./swap-wallet.cjs";
 import { expect, test as base } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -85,4 +85,25 @@ test("a failed swap module preserves the selector and existing recovery data", a
   await page.getByRole("radio", { name: "Instant sell", exact: true }).check();
   await expect(page.getByRole("radio", { name: "Instant sell", exact: true })).toBeChecked();
   expect(await page.evaluate((key) => localStorage.getItem(key), recoveryKey)).toBe(saved);
+});
+
+test("a failed liquidity module preserves recovery and offers navigation back", async ({
+  page,
+  developmentUrl,
+}) => {
+  const key = `aqua-swap-${swapConfig.chainId}-${swapConfig.router.toLowerCase()}`;
+  const saved = JSON.stringify({
+    version: 2,
+    registry: swapConfig.registry,
+    operations: [],
+    workflow: null,
+  });
+  await installSwapConfig(page);
+  await page.addInitScript(({ key, saved }) => localStorage.setItem(key, saved), { key, saved });
+  await page.route("**/src/screens/LiquidityPositionsScreen.tsx*", (route) => route.abort());
+  await page.goto(`${developmentUrl}?view=liquidity`);
+  await expect(page.getByRole("alert")).toContainText("Liquidity positions couldn’t load");
+  await page.getByRole("button", { name: "Back to trading strategy", exact: true }).click();
+  await expect(page.getByRole("radio", { name: "Instant buy", exact: true })).toBeChecked();
+  expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBe(saved);
 });

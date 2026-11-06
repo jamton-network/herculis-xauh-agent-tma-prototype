@@ -23,7 +23,13 @@ const instantStrategies = [
   },
 ] as const;
 
-export function TradingStrategyScreen({ onBack }: { onBack: () => void }) {
+export function TradingStrategyScreen({
+  onBack,
+  onOpenLiquidity,
+}: {
+  onBack: () => void;
+  onOpenLiquidity: () => void;
+}) {
   const [direction, setDirection] = useState<SwapDirection>("instant-buy");
   const [randomResult, setRandomResult] = useState("");
   const [drawNumber, setDrawNumber] = useState(0);
@@ -128,7 +134,7 @@ export function TradingStrategyScreen({ onBack }: { onBack: () => void }) {
             </p>
           }
         >
-          <AquaSwapPanel direction={direction} />
+          <AquaSwapPanel direction={direction} onOpenLiquidity={onOpenLiquidity} />
         </Suspense>
       </SwapBoundary>
     </main>

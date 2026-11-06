@@ -1,5 +1,6 @@
 export default {
   chainId: 11155111,
+  deploymentBlock: "12061729",
   router: "0x286658A30E2c14a99663D31Cb4b2E77E63867428",
   registry: "0xAdE83D979E11fAC08bc09417e0911651F990bf36",
   tokens: {

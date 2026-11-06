@@ -1,5 +1,5 @@
 import { useViewport, useSystemTheme } from "./hooks/browser";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import {
   ActivityLogIcon,
   CheckCircledIcon,
@@ -48,8 +48,11 @@ import { ChatScreen } from "./screens/ChatScreen";
 import { WalletsScreen } from "./screens/WalletsScreen";
 import { ActivityScreen } from "./screens/ActivityScreen";
 import { TradingStrategyScreen } from "./screens/TradingStrategyScreen";
+import { LiquidityBoundary } from "./components/LiquidityBoundary";
 import { Onboarding } from "./screens/Onboarding";
 import { ActivityDetail } from "./screens/ActivityDetail";
+
+const LiquidityPositionsScreen = lazy(() => import("./screens/LiquidityPositionsScreen"));
 
 export default function App() {
   useViewport();
@@ -83,6 +86,10 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(
     () => window.location.hash === "#onboarding",
   );
+  const [showLiquidity, setShowLiquidity] = useState(
+    () => new URLSearchParams(window.location.search).get("view") === "liquidity",
+  );
+  const restoreLiquidityFocus = useRef(false);
   const [showStrategy, setShowStrategy] = useState(() => {
     const requestedView = new URLSearchParams(window.location.search).get("view");
     return requestedView === "strategy" || requestedView === "aqua";
@@ -97,17 +104,40 @@ export default function App() {
   )?.title;
 
   useEffect(() => {
-    if (showStrategy || showOnboarding || !restoreStrategyFocus.current) return;
+    if (showStrategy || showLiquidity || showOnboarding || !restoreStrategyFocus.current) return;
     const frame = window.requestAnimationFrame(() => {
       document.querySelector<HTMLButtonElement>("[data-strategy-entry]")?.focus();
       restoreStrategyFocus.current = false;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [showStrategy, showOnboarding]);
+  }, [showStrategy, showLiquidity, showOnboarding]);
+
+  useEffect(() => {
+    if (showLiquidity || !showStrategy || !restoreLiquidityFocus.current) return;
+    const focus = () => {
+      const entry = document.querySelector<HTMLButtonElement>("[data-liquidity-entry]");
+      if (!entry) return false;
+      entry.focus();
+      restoreLiquidityFocus.current = false;
+      return true;
+    };
+    if (focus()) return;
+    const observer = new MutationObserver(() => {
+      if (focus()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [showLiquidity, showStrategy]);
 
   const closeStrategy = () => {
+    restoreLiquidityFocus.current = false;
     restoreStrategyFocus.current = true;
     setShowStrategy(false);
+  };
+  const closeLiquidity = () => {
+    restoreLiquidityFocus.current = true;
+    setShowLiquidity(false);
+    setShowStrategy(true);
   };
 
   const openStrategy = () => {
@@ -175,6 +205,7 @@ export default function App() {
   };
 
   const changeTab = (tab: TabId) => {
+    setShowLiquidity(false);
     setShowStrategy(false);
     setActiveTab(tab);
   };
@@ -253,9 +284,26 @@ export default function App() {
       data-testid="app-shell"
     >
       <BrandHeader onOpenSettings={() => setSettingsOpen(true)} />
-      {showStrategy ? (
+      {showLiquidity ? (
+        <div key="liquidity" className="app-scroll">
+          <LiquidityBoundary onBack={closeLiquidity}>
+            <Suspense
+              fallback={
+                <p className="live-message" role="status">
+                  Loading liquidity positions…
+                </p>
+              }
+            >
+              <LiquidityPositionsScreen onBack={closeLiquidity} />
+            </Suspense>
+          </LiquidityBoundary>
+        </div>
+      ) : showStrategy ? (
         <div key="strategy" className="app-scroll">
-          <TradingStrategyScreen onBack={closeStrategy} />
+          <TradingStrategyScreen
+            onBack={closeStrategy}
+            onOpenLiquidity={() => setShowLiquidity(true)}
+          />
         </div>
       ) : activeTab === "chat" ? (
         <ChatScreen onOpenStrategy={openStrategy} notify={() => notify("Message sent")} />
@@ -285,7 +333,9 @@ export default function App() {
         </div>
       )}
 
-      {!showStrategy ? <BottomNav active={activeTab} onChange={changeTab} /> : null}
+      {!showStrategy && !showLiquidity ? (
+        <BottomNav active={activeTab} onChange={changeTab} />
+      ) : null}
 
       <BottomSheet
         open={settingsOpen}

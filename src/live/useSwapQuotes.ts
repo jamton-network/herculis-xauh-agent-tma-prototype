@@ -10,6 +10,7 @@ export function useSwapQuotes(
   paused: boolean,
   account?: string,
   chainId?: number,
+  catalogVersion?: number,
 ) {
   useEffect(() => {
     session.invalidateQuotes();
@@ -36,5 +37,5 @@ export function useSwapQuotes(
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [session, direction, amount, slippage, paused, account, chainId]);
+  }, [session, direction, amount, slippage, paused, account, chainId, catalogVersion]);
 }

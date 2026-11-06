@@ -26,6 +26,8 @@ export type BrowserProvider = {
 import {
   feeTokenAbi,
   forkReadAbi,
+  parseSwapOrder,
+  type SwapOrder,
   type SwapConfig,
   type SwapDirection,
   type SwapToken,
@@ -33,6 +35,7 @@ import {
 import {
   feeBreakdown,
   inputToken,
+  outputToken,
   isUnresolved,
   minReceipt,
   operationIdentity,
@@ -49,6 +52,35 @@ import {
   type SwapQuote,
 } from "./swapModel";
 
+import {
+  allowanceTargets,
+  approvalStep,
+  assets,
+  createLiquidityOrder,
+  emptyAmounts,
+  liquiditySteps,
+  randomSalt,
+  readAmounts,
+  storeAmounts,
+  validateWorkflow,
+  workflowConfirmed,
+  workflowIdentity,
+  type LiquidityAction,
+  type LiquidityPosition,
+  type LiquidityStep,
+  type LiquidityWorkflow,
+  type TokenAmounts,
+} from "./liquidityModel";
+import {
+  catalogKey,
+  catalogOrders,
+  discoverPositions,
+  readCatalog,
+  readPosition,
+  type DiscoveryCache,
+} from "./liquidityDiscovery";
+import { actualXauhPushFee } from "./liquidityReceipt";
+
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 export type SwapReadiness = {
   block: bigint;
@@ -56,6 +88,7 @@ export type SwapReadiness = {
   decimals: Record<SwapToken, number>;
   balances: Record<SwapToken, bigint>;
   allowances: Record<SwapToken, bigint>;
+  aquaAllowances: Record<SwapToken, bigint>;
   eth: bigint;
   fee: FeeRate;
 };
@@ -71,6 +104,14 @@ export type SwapState = {
   estimates: SwapEstimate[];
   operations: SwapOperation[];
   storageError?: string;
+  workflow?: LiquidityWorkflow;
+  positions: LiquidityPosition[];
+  catalogVersion: number;
+  discovering: boolean;
+  discoveryMessage: string;
+  discoveryComplete: boolean;
+  tokenDecimals?: Record<SwapToken, number>;
+  problem?: string;
 };
 
 function isRejection(error: unknown): boolean {
@@ -87,6 +128,9 @@ export class SwapSession {
   private generation = 0;
   private quoteRequest = 0;
   private walletEnabled = false;
+  private journalWorkflow?: LiquidityWorkflow;
+  private catalog: DiscoveryCache;
+  private orders: SwapOrder[];
   private walletRefreshQueued = false;
   private client;
   private previewClient;
@@ -99,6 +143,12 @@ export class SwapSession {
     private storage: Storage,
     publicProvider?: BrowserProvider,
   ) {
+    try {
+      this.catalog = readCatalog(storage.getItem(catalogKey(config)), config);
+    } catch {
+      this.catalog = readCatalog(null, config);
+    }
+    this.orders = catalogOrders(config, this.catalog);
     this.storageKey = `aqua-swap-${config.chainId}-${config.router.toLowerCase()}`;
     this.client = createPublicClient({
       chain: sepolia,
@@ -138,6 +188,12 @@ export class SwapSession {
       chainId: 0,
       estimates: [],
       operations,
+      workflow: this.journalWorkflow,
+      positions: [],
+      catalogVersion: 0,
+      discovering: false,
+      discoveryMessage: "Position discovery has not completed.",
+      discoveryComplete: false,
       storageError,
       message: "Connect your browser wallet to trade on Sepolia.",
     };
@@ -212,7 +268,8 @@ export class SwapSession {
       if (event.key !== this.storageKey) return;
       this.contextChanged();
       try {
-        this.update({ operations: this.readOperations() });
+        const operations = this.readOperations();
+        this.update({ operations, workflow: this.journalWorkflow });
       } catch {
         this.update({ storageError: "Recovery data changed unexpectedly. Writes are blocked." });
       }
@@ -243,16 +300,26 @@ export class SwapSession {
         polling = false;
       }
     };
-    const visible = () => void pollWallet();
+    const discover = () => {
+      if (!document.hidden && !this.state.busy && !this.state.operations.some(isUnresolved))
+        void this.refreshPositions();
+    };
+    const visible = () => {
+      discover();
+      void pollWallet();
+    };
+    const discoveryTimer = window.setInterval(discover, 30_000);
     const walletTimer = window.setInterval(pollWallet, 5000);
     window.addEventListener("focus", pollWallet);
     document.addEventListener("visibilitychange", visible);
+    discover();
     return () => {
       active = false;
       for (const event of ["accountsChanged", "chainChanged", "disconnect"])
         this.provider?.removeListener?.(event, this.contextChanged);
       window.removeEventListener("storage", changed);
       window.removeEventListener("focus", pollWallet);
+      window.clearInterval(discoveryTimer);
       window.clearInterval(walletTimer);
       document.removeEventListener("visibilitychange", visible);
       this.invalidateQuotes();
@@ -261,10 +328,13 @@ export class SwapSession {
 
   private readOperations(): SwapOperation[] {
     const raw = this.storage.getItem(this.storageKey);
-    if (!raw) return [];
+    if (!raw) {
+      this.journalWorkflow = undefined;
+      return [];
+    }
     const saved = JSON.parse(raw);
     if (
-      saved.version !== 1 ||
+      ![1, 2].includes(saved.version) ||
       saved.registry !== this.config.registry ||
       !Array.isArray(saved.operations)
     )
@@ -278,7 +348,9 @@ export class SwapSession {
         operation.nonce < 0 ||
         BigInt(operation.startBlock) < 0n ||
         BigInt(operation.scanBlock) < BigInt(operation.startBlock) ||
-        !["approval", "swap"].includes(operation.kind) ||
+        !["approval", "swap", "initialize", "ship", "push", "update-reserves", "dock"].includes(
+          operation.kind,
+        ) ||
         ![
           "awaiting-wallet",
           "ambiguous",
@@ -291,6 +363,14 @@ export class SwapSession {
         ].includes(operation.status) ||
         (operation.hash && !/^0x[\da-f]{64}$/i.test(operation.hash)) ||
         (operation.receiptBlockHash && !/^0x[\da-f]{64}$/i.test(operation.receiptBlockHash)) ||
+        (operation.actualFee !== undefined &&
+          (!/^\d+$/.test(operation.actualFee) || BigInt(operation.actualFee) >= 1n << 248n)) ||
+        (operation.workflowId &&
+          (!/^0x[\da-f]{64}$/i.test(operation.workflowId) ||
+            !operation.stepId ||
+            !operation.order ||
+            !sameAddress(parseSwapOrder(operation.order).maker, operation.account))) ||
+        (operation.kind !== "swap" && operation.kind !== "approval" && !operation.workflowId) ||
         operationIdentity(this.config, operation) !== operation.id
       )
         throw new Error("Invalid recovery operation.");
@@ -300,20 +380,33 @@ export class SwapSession {
       saved.operations.length
     )
       throw new Error("Duplicate recovery operation.");
+    this.journalWorkflow =
+      saved.version === 2 && saved.workflow
+        ? validateWorkflow(this.config, saved.workflow)
+        : undefined;
     return saved.operations;
   }
 
-  private save(operations: SwapOperation[]) {
+  private save(
+    operations: SwapOperation[],
+    workflow: LiquidityWorkflow | null | undefined = this.state.workflow,
+  ) {
     if (this.state.storageError) throw new Error(this.state.storageError);
     try {
-      const raw = JSON.stringify({ version: 1, registry: this.config.registry, operations });
+      const raw = JSON.stringify({
+        version: 2,
+        registry: this.config.registry,
+        operations,
+        workflow: workflow ?? null,
+      });
       this.storage.setItem(this.storageKey, raw);
       if (this.storage.getItem(this.storageKey) !== raw) throw new Error("Storage write failed.");
     } catch {
       this.update({ storageError: "Transaction recovery could not be saved. Writes are blocked." });
       throw new Error("Recovery storage failed. Reconcile any wallet request before continuing.");
     }
-    this.update({ operations });
+    this.journalWorkflow = workflow ?? undefined;
+    this.update({ operations, workflow: workflow ?? undefined });
   }
   private replace(operation: SwapOperation) {
     this.save(this.state.operations.map((item) => (item.id === operation.id ? operation : item)));
@@ -321,11 +414,16 @@ export class SwapSession {
   private async run(action: () => Promise<void>) {
     if (this.state.busy) return;
     this.quoteRequest++;
-    this.update({ busy: true, quoting: false });
+    this.update({ busy: true, quoting: false, problem: undefined });
     try {
       await action();
     } catch (error) {
       this.update({
+        problem: isRejection(error)
+          ? "Cancelled in your wallet. You can try this step again."
+          : error instanceof Error
+            ? error.message
+            : "The action could not be completed.",
         message: isRejection(error)
           ? "Wallet request rejected. Nothing was retried automatically."
           : error instanceof Error
@@ -346,7 +444,8 @@ export class SwapSession {
       throw new Error("Use a browser with Web Locks to protect transaction recovery.");
     await navigator.locks.request(this.storageKey, { ifAvailable: true }, async (lock) => {
       if (!lock) throw new Error("Another tab is handling a transaction. Reconcile there first.");
-      this.update({ operations: this.readOperations() });
+      const operations = this.readOperations();
+      this.update({ operations, workflow: this.journalWorkflow });
       await action();
     });
   }
@@ -467,10 +566,11 @@ export class SwapSession {
     const generation = this.generation;
     const { block, decimals, fee } = await this.inspect(this.client);
     const balances = {} as Record<SwapToken, bigint>,
-      allowances = {} as Record<SwapToken, bigint>;
+      allowances = {} as Record<SwapToken, bigint>,
+      aquaAllowances = {} as Record<SwapToken, bigint>;
     await Promise.all(
       (["xauh", "usdt"] as const).map(async (token) => {
-        [balances[token], allowances[token]] = await Promise.all([
+        [balances[token], allowances[token], aquaAllowances[token]] = await Promise.all([
           this.client.readContract({
             address: this.config.tokens[token],
             abi: erc20Abi,
@@ -483,6 +583,13 @@ export class SwapSession {
             abi: erc20Abi,
             functionName: "allowance",
             args: [account, this.config.router],
+            blockNumber: block.number,
+          }),
+          this.client.readContract({
+            address: this.config.tokens[token],
+            abi: erc20Abi,
+            functionName: "allowance",
+            args: [account, this.config.registry],
             blockNumber: block.number,
           }),
         ]);
@@ -499,9 +606,11 @@ export class SwapSession {
         decimals,
         balances,
         allowances,
+        aquaAllowances,
         eth,
         fee,
       },
+      tokenDecimals: decimals,
     });
   }
 
@@ -522,76 +631,127 @@ export class SwapSession {
       const input = parseAmount(text, decimals[inputToken(direction)]);
       const deadline = block.timestamp + 90n,
         expiresAt = Number(deadline) * 1000;
-      const estimates = await Promise.all(
-        this.config.orders.map(async (order): Promise<SwapEstimate> => {
-          try {
-            if (sameAddress(order.maker, account))
-              throw new Error("Use a different wallet from the liquidity provider.");
-            const initialized = await this.previewClient.readContract({
-              address: this.config.router,
-              abi: forkReadAbi,
-              functionName: "feeOnTransferInitialized",
-              args: [order.hash],
-              blockNumber: block.number,
-            });
-            if (!initialized) throw new Error("This liquidity position is not initialized.");
-            for (const asset of ["xauh", "usdt"] as const) {
-              const [, count] = await this.previewClient.readContract({
-                address: this.config.registry,
-                abi: registryAbi,
-                functionName: "rawBalances",
-                args: [order.maker, this.config.router, order.hash, this.config.tokens[asset]],
-                blockNumber: block.number,
-              });
-              if (count !== 2) throw new Error("This liquidity position is closed or unavailable.");
-            }
-            const result = await this.previewClient.call({
-              account: account ?? zeroAddress,
-              ...swapPayload(this.config, { order, direction, input, minimum: 1n, deadline }, true),
-              blockNumber: block.number,
-            });
-            if (!result.data) throw new Error("Router returned no quote.");
-            const [amountIn, output, hash] = decodeFunctionResult({
-              abi: routerAbi,
-              functionName: "quote",
-              data: result.data,
-            });
-            if (amountIn !== input || output <= 0n || hash !== order.hash)
-              throw new Error("Router quote does not match the selected position.");
-            const firstInputFee = direction === "instant-sell" ? tokenFee(input, fee) : 0n;
-            const swapFee =
-              ((input - firstInputFee) * order.feeUnits + 999_999_999n) / 1_000_000_000n;
-            return {
-              family: order.family,
-              quote: {
-                order,
-                direction,
-                account,
-                input,
-                output,
-                minimum: minReceipt(output, slippage),
-                transferFees: feeBreakdown(direction, input, output, fee),
-                swapFee,
-                feeRate: fee,
-                block: block.number,
-                deadline,
-                expiresAt,
-                generation,
-              },
-            };
-          } catch (error) {
-            return {
-              family: order.family,
-              error: error instanceof Error ? error.message : "Quote unavailable.",
-            };
-          }
-        }),
-      );
+      const estimates: SwapEstimate[] = [];
+      for (let offset = 0; offset < this.orders.length; offset += 4) {
+        estimates.push(
+          ...(await Promise.all(
+            this.orders.slice(offset, offset + 4).map(async (order): Promise<SwapEstimate> => {
+              try {
+                if (sameAddress(order.maker, account))
+                  throw new Error("Use a different wallet from the liquidity provider.");
+                const initialized = await this.previewClient.readContract({
+                  address: this.config.router,
+                  abi: forkReadAbi,
+                  functionName: "feeOnTransferInitialized",
+                  args: [order.hash],
+                  blockNumber: block.number,
+                });
+                if (!initialized) throw new Error("This liquidity position is not initialized.");
+                const allocations = {} as TokenAmounts;
+                for (const asset of ["xauh", "usdt"] as const) {
+                  const [allocation, count] = await this.previewClient.readContract({
+                    address: this.config.registry,
+                    abi: registryAbi,
+                    functionName: "rawBalances",
+                    args: [order.maker, this.config.router, order.hash, this.config.tokens[asset]],
+                    blockNumber: block.number,
+                  });
+                  if (count !== 2)
+                    throw new Error("This liquidity position is closed or unavailable.");
+                  allocations[asset] = allocation;
+                }
+                const result = await this.previewClient.call({
+                  account: account ?? zeroAddress,
+                  ...swapPayload(
+                    this.config,
+                    { order, direction, input, minimum: 1n, deadline },
+                    true,
+                  ),
+                  blockNumber: block.number,
+                });
+                if (!result.data) throw new Error("Router returned no quote.");
+                const [amountIn, output, hash] = decodeFunctionResult({
+                  abi: routerAbi,
+                  functionName: "quote",
+                  data: result.data,
+                });
+                if (amountIn !== input || output <= 0n || hash !== order.hash)
+                  throw new Error("Router quote does not match the selected position.");
+                const outToken = outputToken(direction);
+                const debit =
+                  direction === "instant-buy"
+                    ? (output * fee.parts) / (fee.parts - fee.rate)
+                    : output;
+                const [makerBalance, makerAllowance] = await Promise.all([
+                  this.previewClient.readContract({
+                    address: this.config.tokens[outToken],
+                    abi: erc20Abi,
+                    functionName: "balanceOf",
+                    args: [order.maker],
+                    blockNumber: block.number,
+                  }),
+                  this.previewClient.readContract({
+                    address: this.config.tokens[outToken],
+                    abi: erc20Abi,
+                    functionName: "allowance",
+                    args: [order.maker, this.config.registry],
+                    blockNumber: block.number,
+                  }),
+                ]);
+                if (makerBalance < debit || makerAllowance < debit || allocations[outToken] < debit)
+                  throw new Error("Insufficient available liquidity for this quote.");
+                const firstInputFee = direction === "instant-sell" ? tokenFee(input, fee) : 0n;
+                const swapFee =
+                  ((input - firstInputFee) * order.feeUnits + 999_999_999n) / 1_000_000_000n;
+                return {
+                  family: order.family,
+                  quote: {
+                    order,
+                    direction,
+                    account,
+                    input,
+                    output,
+                    minimum: minReceipt(output, slippage),
+                    transferFees: feeBreakdown(direction, input, output, fee),
+                    swapFee,
+                    feeRate: fee,
+                    block: block.number,
+                    deadline,
+                    expiresAt,
+                    generation,
+                  },
+                };
+              } catch (error) {
+                return {
+                  family: order.family,
+                  error: error instanceof Error ? error.message : "Quote unavailable.",
+                };
+              }
+            }),
+          )),
+        );
+        if (!current()) return;
+      }
       if (!current()) return;
       if (Date.now() >= expiresAt)
         throw new Error("Quotes expired while loading. Refreshing again shortly.");
+      const bestEstimates = (["constant-product", "concentrated-liquidity"] as const).map(
+        (family) => {
+          const candidates = estimates.filter((item) => item.family === family);
+          return candidates.reduce<SwapEstimate>(
+            (best, item) =>
+              item.quote && (!best.quote || item.quote.output > best.quote.output) ? item : best,
+            {
+              family,
+              error:
+                candidates.find((item) => item.error)?.error ??
+                "No eligible position in this AMM family.",
+            },
+          );
+        },
+      );
       this.update({
-        estimates,
+        estimates: bestEstimates,
         quoteContext: { block: block.number, timestamp: block.timestamp, decimals, fee },
         quoteMessage: estimates.some((item) => item.quote)
           ? "Fresh quotes ready. Auto-refreshes every 15 seconds."
@@ -611,6 +771,446 @@ export class SwapSession {
     }
   }
 
+  async refreshPositions(discover = true) {
+    if (this.state.discovering) return;
+    this.update({ discovering: true });
+    try {
+      const { block, decimals } = await this.inspect(this.previewClient, true);
+      this.update({ tokenDecimals: decimals });
+      if (discover) {
+        const result = await discoverPositions(
+          this.previewClient,
+          this.config,
+          this.catalog,
+          block.number,
+        );
+        this.catalog = result.cache;
+        try {
+          this.storage.setItem(catalogKey(this.config), JSON.stringify(this.catalog));
+        } catch {
+          result.message +=
+            " Discovery cache could not be saved; encoded-order import remains available.";
+        }
+        this.update({ discoveryComplete: result.complete, discoveryMessage: result.message });
+      }
+      const orders = catalogOrders(
+        this.config,
+        this.catalog,
+        this.state.workflow ? [this.state.workflow.encoded] : [],
+      );
+      const changed =
+        orders.map((order) => order.hash).join() !== this.orders.map((order) => order.hash).join();
+      this.orders = orders;
+      const positions: LiquidityPosition[] = [];
+      for (let i = 0; i < orders.length; i += 4)
+        positions.push(
+          ...(await Promise.all(
+            orders
+              .slice(i, i + 4)
+              .map((order) => readPosition(this.previewClient, this.config, order, block.number)),
+          )),
+        );
+      this.update({ positions, catalogVersion: this.state.catalogVersion + (changed ? 1 : 0) });
+      if (changed) this.invalidateQuotes();
+    } catch {
+      this.update({
+        discoveryComplete: false,
+        discoveryMessage:
+          "Discovery is incomplete. Retry the scan or import an encoded order. Cached positions still require current on-chain verification.",
+      });
+    } finally {
+      this.update({ discovering: false });
+    }
+  }
+
+  async importPosition(encoded: string) {
+    try {
+      this.update({ problem: undefined });
+      const order = parseSwapOrder(encoded.trim());
+      const { block } = await this.inspect(this.previewClient, true);
+      const position = await readPosition(this.previewClient, this.config, order, block.number);
+      if (["unavailable", "draft"].includes(position.status))
+        throw new Error("This order is not a supported initialized XAUH/USDT position.");
+      this.catalog.entries.push({ encoded: order.encoded });
+      this.storage.setItem(catalogKey(this.config), JSON.stringify(this.catalog));
+      await this.refreshPositions(false);
+      this.update({ message: "Encoded order imported and verified against current chain state." });
+    } catch (error) {
+      this.update({
+        message: error instanceof Error ? error.message : "Order import failed.",
+        problem: error instanceof Error ? error.message : "Order import failed.",
+      });
+    }
+  }
+
+  workflowIncomplete() {
+    const workflow = this.state.workflow;
+    return Boolean(
+      workflow &&
+      liquiditySteps(this.config, workflow).some(
+        (step) => !workflowConfirmed(workflow, step, this.state.operations),
+      ),
+    );
+  }
+
+  reviewLiquidity(input: {
+    action: LiquidityAction;
+    amounts: TokenAmounts;
+    order?: Hex;
+    family?: ExecutionFamily;
+    feeBps?: string;
+    minimum?: string;
+    maximum?: string;
+  }) {
+    return this.run(async () =>
+      this.exclusive(async () => {
+        if (this.state.operations.some(isUnresolved))
+          throw new Error("Reconcile the unresolved transaction first.");
+        if (this.workflowIncomplete())
+          throw new Error("Resume or discard the saved liquidity workflow first.");
+        await this.checkConfirmed();
+        await this.refreshInternal();
+        const ready = this.state.readiness!,
+          account = this.state.account!;
+        let order: SwapOrder;
+        if (input.action === "create") {
+          let attempts = 0;
+          do {
+            order = createLiquidityOrder(
+              this.config,
+              account,
+              input.family ?? "constant-product",
+              input.amounts,
+              ready.decimals,
+              input.feeBps ?? "0",
+              input.minimum ?? "0",
+              input.maximum ?? "0",
+              randomSalt(),
+            );
+            if (++attempts > 8) throw new Error("A unique order salt could not be generated.");
+          } while (
+            this.orders.some((known) => known.hash === order.hash) ||
+            this.state.operations.some((operation) => operation.order === order.encoded)
+          );
+        } else {
+          order = parseSwapOrder(input.order);
+        }
+        if (!sameAddress(order.maker, account))
+          throw new Error("Only the position maker can manage this order.");
+        const position = await readPosition(this.client, this.config, order, ready.block);
+        if (position.error || position.status === "closed")
+          throw new Error(
+            position.error ?? "Closed orders cannot be reused. Create a new position.",
+          );
+        if (input.action === "create" ? position.status !== "draft" : position.status !== "active")
+          throw new Error("Position lifecycle changed. Refresh its current state.");
+        if (assets.some((token) => input.amounts[token] < 0n || input.amounts[token] >= 1n << 248n))
+          throw new Error("Invalid reserve amount.");
+        const targets = emptyAmounts(),
+          increments = emptyAmounts();
+        for (const token of assets) {
+          targets[token] =
+            input.action === "add"
+              ? position.reserves[token] + input.amounts[token]
+              : input.amounts[token];
+          increments[token] =
+            input.action === "create" || input.action === "remove"
+              ? 0n
+              : input.action === "add"
+                ? input.amounts[token]
+                : targets[token] > position.allocations[token]
+                  ? targets[token] - position.allocations[token]
+                  : 0n;
+        }
+        if (
+          input.action !== "remove" &&
+          (targets.xauh + targets.usdt <= 0n ||
+            (order.family === "constant-product" && (targets.xauh === 0n || targets.usdt === 0n)) ||
+            assets.some((token) => targets[token] >= 1n << 248n))
+        )
+          throw new Error("Resulting reserves are invalid for this pricing type.");
+        if (input.action === "add" && increments.xauh + increments.usdt === 0n)
+          throw new Error("Enter at least one positive increment.");
+        if (
+          input.action === "ratio" &&
+          assets.every((token) => targets[token] === position.reserves[token])
+        )
+          throw new Error("Reserve totals have not changed.");
+        const workflow: LiquidityWorkflow = {
+          id: workflowIdentity(order, ready.block, input.action),
+          action: input.action,
+          encoded: order.encoded,
+          maker: account,
+          baseReserves: storeAmounts(position.reserves),
+          baseAllocations: storeAmounts(position.allocations),
+          increments: storeAmounts(increments),
+          targets: storeAmounts(targets),
+          reviewedBlock: ready.block.toString(),
+          fee: { rate: ready.fee.rate.toString(), parts: ready.fee.parts.toString() },
+        };
+        this.validateLiquidityFunds(workflow, ready, position);
+        await this.identity();
+        if (!sameAddress(account, this.state.account))
+          throw new Error("Maker wallet changed during review.");
+        this.save(this.state.operations, workflow);
+        await this.refreshPositions(false);
+        this.update({
+          message:
+            "Liquidity review saved. Every approval and contract call requires its own explicit confirmation.",
+        });
+      }),
+    );
+  }
+
+  private validateLiquidityFunds(
+    workflow: LiquidityWorkflow,
+    ready: SwapReadiness,
+    position: LiquidityPosition,
+  ) {
+    if (workflow.action === "remove") return;
+    const targets = readAmounts(workflow.targets),
+      increments = readAmounts(workflow.increments);
+    const required = workflow.action === "create" ? targets : { ...position.allocations };
+    for (const token of assets) {
+      const pushed = this.state.operations.some(
+        (operation) =>
+          operation.workflowId === workflow.id &&
+          operation.stepId === `push-${token}` &&
+          operation.status === "confirmed",
+      );
+      const remaining = pushed ? 0n : increments[token];
+      if (workflow.action !== "create") required[token] += remaining;
+      if (required[token] >= 1n << 248n)
+        throw new Error("The resulting Aqua allocation exceeds uint248.");
+      const fee = token === "xauh" ? tokenFee(remaining, ready.fee) : 0n;
+      if (ready.balances[token] < required[token] + fee)
+        throw new Error(
+          `Insufficient shared wallet ${token.toUpperCase()} for the allocation and push transfer fee.`,
+        );
+      if (targets[token] > required[token])
+        throw new Error("Reviewed targets exceed the resulting Aqua allocation.");
+    }
+  }
+
+  liquidityNext(): LiquidityStep | undefined {
+    const workflow = this.state.workflow,
+      ready = this.state.readiness;
+    if (!workflow || !this.workflowIncomplete()) return undefined;
+    if (ready && workflow.action !== "remove") {
+      const allowances = allowanceTargets(workflow, this.state.operations);
+      for (const token of assets)
+        if (ready.aquaAllowances[token] < allowances[token])
+          return approvalStep(
+            this.config,
+            token,
+            ready.aquaAllowances[token] === 0n ? allowances[token] : 0n,
+          );
+    }
+    return liquiditySteps(this.config, workflow).find(
+      (step) => !workflowConfirmed(workflow, step, this.state.operations),
+    );
+  }
+
+  executeLiquidityStep(expectedId: string) {
+    const requested = this.liquidityNext();
+    if (!requested || requested.id !== expectedId) return Promise.resolve();
+    return this.write(requested.kind, async () => {
+      const workflow = this.state.workflow,
+        ready = this.state.readiness!;
+      if (!workflow || !sameAddress(workflow.maker, this.state.account))
+        throw new Error("Reconnect the maker wallet to resume this workflow.");
+      const step = this.liquidityNext();
+      if (!step || step.id !== requested.id || step.data !== requested.data)
+        throw new Error("Liquidity state or allowance changed. Review the next action again.");
+      const order = parseSwapOrder(workflow.encoded);
+      const position = await readPosition(this.client, this.config, order, ready.block);
+      if (position.error || position.status === "closed")
+        throw new Error(position.error ?? "This order is closed permanently.");
+      if (
+        workflow.fee.rate !== ready.fee.rate.toString() ||
+        workflow.fee.parts !== ready.fee.parts.toString()
+      )
+        throw new Error("Transfer fees changed. Review the liquidity targets again.");
+      const targets = readAmounts(workflow.targets);
+      if (workflow.action === "create") {
+        const initialized = this.state.operations.some(
+          (operation) =>
+            operation.workflowId === workflow.id &&
+            operation.kind === "initialize" &&
+            operation.status === "confirmed",
+        );
+        if (
+          position.status !== (initialized ? "initialized" : "draft") ||
+          (initialized && assets.some((token) => position.reserves[token] !== targets[token]))
+        )
+          throw new Error(
+            "Creation state changed. Reconcile all confirmed steps before continuing.",
+          );
+      } else {
+        if (position.status !== "active") throw new Error("Position is no longer active.");
+        const base = readAmounts(workflow.baseReserves),
+          allocation = readAmounts(workflow.baseAllocations),
+          increments = readAmounts(workflow.increments);
+        const changed = assets.some((token) => {
+          const pushed = this.state.operations.some(
+            (operation) =>
+              operation.workflowId === workflow.id &&
+              operation.stepId === `push-${token}` &&
+              operation.status === "confirmed",
+          );
+          return (
+            position.reserves[token] !== base[token] ||
+            position.allocations[token] !== allocation[token] + (pushed ? increments[token] : 0n)
+          );
+        });
+        if (changed)
+          throw new Error(
+            "Position reserves or allocation changed since review. Refresh and review the saved targets again.",
+          );
+      }
+      this.validateLiquidityFunds(workflow, ready, position);
+      return {
+        to: step.to,
+        data: step.data,
+        workflowId: workflow.id,
+        stepId: step.id,
+        order: order.encoded,
+        feeRate: workflow.fee,
+      };
+    });
+  }
+
+  rereviewLiquidity() {
+    return this.run(async () =>
+      this.exclusive(async () => {
+        const workflow = this.state.workflow;
+        if (!workflow || this.state.operations.some(isUnresolved))
+          throw new Error("Reconcile the pending action before reviewing targets.");
+        await this.checkConfirmed();
+        await this.refreshInternal();
+        if (!sameAddress(workflow.maker, this.state.account))
+          throw new Error("Reconnect the maker wallet.");
+        const ready = this.state.readiness!,
+          position = await readPosition(
+            this.client,
+            this.config,
+            parseSwapOrder(workflow.encoded),
+            ready.block,
+          );
+        if (position.error || position.status === "closed")
+          throw new Error(
+            position.error ?? "This workflow cannot be rebased. Reconcile its recorded steps.",
+          );
+        const allocation = { ...position.allocations },
+          increments = readAmounts(workflow.increments),
+          targets = readAmounts(workflow.targets);
+        for (const token of assets) {
+          const pushed = this.state.operations.some(
+            (operation) =>
+              operation.workflowId === workflow.id &&
+              operation.stepId === `push-${token}` &&
+              operation.status === "confirmed",
+          );
+          if (pushed) {
+            if (allocation[token] < increments[token] || targets[token] > allocation[token])
+              throw new Error(
+                "A completed push no longer covers these targets. Finish or close the position after reviewing current chain state.",
+              );
+            allocation[token] -= increments[token];
+          } else if (workflow.action === "ratio")
+            increments[token] =
+              targets[token] > allocation[token] ? targets[token] - allocation[token] : 0n;
+        }
+        const updated = {
+          ...workflow,
+          baseReserves: storeAmounts(position.reserves),
+          baseAllocations: storeAmounts(allocation),
+          increments: storeAmounts(increments),
+          reviewedBlock: ready.block.toString(),
+          fee: { rate: ready.fee.rate.toString(), parts: ready.fee.parts.toString() },
+        };
+        this.validateLiquidityFunds(updated, ready, position);
+        this.save(this.state.operations, updated);
+        this.update({
+          message:
+            "The same target totals were reviewed against current reserves, allocation and transfer fees. Confirm the next action explicitly.",
+        });
+      }),
+    );
+  }
+
+  discardLiquidity() {
+    return this.run(async () =>
+      this.exclusive(async () => {
+        const workflow = this.state.workflow;
+        if (!workflow) return;
+        if (this.state.operations.some(isUnresolved))
+          throw new Error("Reconcile the unresolved transaction first.");
+        const { block } = await this.inspect(this.previewClient, true);
+        const position = await readPosition(
+          this.previewClient,
+          this.config,
+          parseSwapOrder(workflow.encoded),
+          block.number,
+        );
+        if (
+          position.status !== "closed" &&
+          this.workflowIncomplete() &&
+          this.state.operations.some(
+            (operation) =>
+              operation.workflowId === workflow.id &&
+              operation.kind !== "approval" &&
+              operation.status === "confirmed",
+          )
+        )
+          throw new Error(
+            "A liquidity step already changed chain state. Resume the saved workflow to preserve its completed steps.",
+          );
+        this.save(this.state.operations, null);
+        this.update({
+          message: "Saved workflow cleared. Existing Aqua allowances remain unchanged.",
+        });
+      }),
+    );
+  }
+
+  reviewLiquidityClosure() {
+    return this.run(async () =>
+      this.exclusive(async () => {
+        const current = this.state.workflow;
+        if (!current || this.state.operations.some(isUnresolved))
+          throw new Error("Reconcile the pending operation first.");
+        await this.checkConfirmed();
+        await this.refreshInternal();
+        if (!sameAddress(current.maker, this.state.account))
+          throw new Error("Reconnect the maker wallet.");
+        const ready = this.state.readiness!,
+          order = parseSwapOrder(current.encoded);
+        const position = await readPosition(this.client, this.config, order, ready.block);
+        if (position.status !== "active")
+          throw new Error(
+            "Only an active position can be docked. Complete initial activation or refresh its current state.",
+          );
+        const workflow: LiquidityWorkflow = {
+          ...current,
+          id: workflowIdentity(order, ready.block, "remove"),
+          action: "remove",
+          baseReserves: storeAmounts(position.reserves),
+          baseAllocations: storeAmounts(position.allocations),
+          increments: storeAmounts(emptyAmounts()),
+          targets: storeAmounts(emptyAmounts()),
+          reviewedBlock: ready.block.toString(),
+          fee: { rate: ready.fee.rate.toString(), parts: ready.fee.parts.toString() },
+        };
+        this.save(this.state.operations, workflow);
+        this.update({
+          message:
+            "Full closure reviewed. Confirm Close position to dock this order permanently. Previous pushes remain recorded.",
+        });
+      }),
+    );
+  }
+
   private selected(family: ExecutionFamily): SwapQuote {
     const quote = this.state.estimates.find((item) => item.family === family)?.quote;
     if (
@@ -624,6 +1224,8 @@ export class SwapSession {
   }
   approve(family: ExecutionFamily, reset: boolean, token: SwapToken) {
     return this.write("approval", async () => {
+      if (this.workflowIncomplete())
+        throw new Error("Complete the liquidity workflow before another financial action.");
       const ready = this.state.readiness!;
       const current = ready.allowances[token];
       const quote = reset ? undefined : this.selected(family);
@@ -644,6 +1246,8 @@ export class SwapSession {
   }
   swap(family: ExecutionFamily) {
     return this.write("swap", async () => {
+      if (this.workflowIncomplete())
+        throw new Error("Complete the liquidity workflow before swapping.");
       const quote = this.selected(family),
         ready = this.state.readiness!,
         token = inputToken(quote.direction);
@@ -666,7 +1270,9 @@ export class SwapSession {
 
   private write(
     kind: SwapOperation["kind"],
-    prepare: () => Promise<{ to: Address; data: Hex; feeRate?: SwapOperation["feeRate"] }>,
+    prepare: () => Promise<
+      Pick<SwapOperation, "to" | "data" | "feeRate" | "workflowId" | "stepId" | "order">
+    >,
   ) {
     return this.run(async () =>
       this.exclusive(async () => {
@@ -884,7 +1490,7 @@ export class SwapSession {
           this.replace({
             ...operation,
             status: "reverted",
-            evidence: "Transaction reverted. No successful swap is recorded.",
+            evidence: "Transaction reverted. Its requested changes were not applied.",
           });
         } else {
           try {
@@ -894,7 +1500,23 @@ export class SwapSession {
               status: "confirmed",
               evidence,
               receiptBlockHash: receipt.blockHash,
+              actualFee: actualXauhPushFee(this.config, operation, receipt),
             });
+            if (
+              operation.order &&
+              operation.kind !== "approval" &&
+              !this.catalog.entries.some((entry) => entry.encoded === operation!.order)
+            ) {
+              this.catalog.entries.push({ encoded: operation.order });
+              try {
+                this.storage.setItem(catalogKey(this.config), JSON.stringify(this.catalog));
+              } catch {
+                this.update({
+                  discoveryMessage:
+                    "The position is in transaction recovery; its discovery cache could not be saved.",
+                });
+              }
+            }
           } catch {
             this.replace({
               ...operation,
@@ -911,6 +1533,7 @@ export class SwapSession {
             "Transaction checked.",
         });
         await this.refreshInternal();
+        await this.refreshPositions(false);
       }),
     );
   }

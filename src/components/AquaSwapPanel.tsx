@@ -8,10 +8,17 @@ import { useAquaWallet } from "../live/SwapContext";
 import { useSwapQuotes } from "../live/useSwapQuotes";
 import { AquaExecution } from "./AquaExecution";
 
-export default function AquaSwapPanel({ direction }: { direction: SwapDirection }) {
+export default function AquaSwapPanel({
+  direction,
+  onOpenLiquidity,
+}: {
+  direction: SwapDirection;
+  onOpenLiquidity: () => void;
+}) {
   const { session, error } = useAquaWallet();
   const [fallbackSelected, setFallbackSelected] = useState<ExecutionFamily>("constant-product");
-  if (session) return <SwapForm direction={direction} session={session} />;
+  if (session)
+    return <SwapForm direction={direction} session={session} onOpenLiquidity={onOpenLiquidity} />;
   if (error)
     return (
       <>
@@ -41,7 +48,15 @@ export default function AquaSwapPanel({ direction }: { direction: SwapDirection 
   );
 }
 
-function SwapForm({ direction, session }: { direction: SwapDirection; session: SwapSession }) {
+function SwapForm({
+  direction,
+  session,
+  onOpenLiquidity,
+}: {
+  direction: SwapDirection;
+  session: SwapSession;
+  onOpenLiquidity: () => void;
+}) {
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [amounts, setAmounts] = useState({ "instant-buy": "1", "instant-sell": "1" });
   const [slippage, setSlippage] = useState("50");
@@ -61,7 +76,8 @@ function SwapForm({ direction, session }: { direction: SwapDirection; session: S
   const quote = estimates.find((item) => item.family === selected)?.quote;
   const expired = Boolean(quote && now >= quote.expiresAt);
   const pending = state.operations.find(isUnresolved);
-  const blocked = state.busy || Boolean(pending) || Boolean(state.storageError);
+  const blocked =
+    state.busy || Boolean(pending) || Boolean(state.storageError) || session.workflowIncomplete();
   const correctChain = state.chainId === swapNetwork.chainId;
   const allowance = ready?.allowances[token];
   const configured = Boolean(state.account && correctChain && ready);
@@ -76,6 +92,7 @@ function SwapForm({ direction, session }: { direction: SwapDirection; session: S
     state.busy || Boolean(pending),
     state.account,
     state.chainId,
+    state.catalogVersion,
   );
   return (
     <>
@@ -139,6 +156,19 @@ function SwapForm({ direction, session }: { direction: SwapDirection; session: S
         aria-labelledby="swap-wallet-heading"
       >
         <h2 id="swap-wallet-heading">Wallet & swap</h2>
+        <button
+          type="button"
+          className="button button--secondary"
+          data-liquidity-entry
+          onClick={onOpenLiquidity}
+        >
+          Liquidity positions
+        </button>
+        {session.workflowIncomplete() && (
+          <p className="section-help">
+            Resume the saved liquidity workflow before another swap or approval.
+          </p>
+        )}
         <p className="section-help">
           Each approval and swap is a separate action confirmed in your browser wallet.
         </p>

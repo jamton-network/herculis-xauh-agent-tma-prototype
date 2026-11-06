@@ -192,6 +192,7 @@ test("connected wallet context stays current when provider events are missing", 
   let stop: (() => void) | undefined;
   try {
     stop = h.session.listen();
+    await expect.poll(() => h.session.state.discovering).toBe(false);
     await h.session.quote("instant-buy", "1", "50");
     expect(h.session.state.estimates.some((item) => item.quote)).toBe(true);
     const check = timers.get(5000);

@@ -4,6 +4,7 @@ import {
   AquaXYCAmmStrategy,
   Address as SdkAddress,
   MakerTraits,
+  HexString,
   Order,
 } from "@1inch/swap-vm-sdk";
 import {
@@ -20,6 +21,7 @@ import {
   type Hex,
 } from "viem";
 import { parseSwapConfig, forkReadAbi, feeTokenAbi } from "../src/live/swapConfig";
+import { liquidityAbi } from "../src/live/liquidityModel";
 import { registryAbi, routerAbi, sameAddress, tokenFee } from "../src/live/swapModel";
 export const maker = "0x0000000000000000000000000000000000000011" as const;
 export const buyer = "0x0000000000000000000000000000000000000022" as const;
@@ -42,6 +44,7 @@ const order = (concentrated: boolean) =>
     .toString();
 export const publicSwapConfig = {
   chainId: 11155111,
+  deploymentBlock: "1",
   rpcUrl: "/aqua-rpc",
   router: "0x0000000000000000000000000000000000000101",
   registry: "0x0000000000000000000000000000000000000102",
@@ -58,9 +61,16 @@ export const publicSwapConfig = {
   orders: [{ encoded: order(false) }, { encoded: order(true) }],
 };
 export const config = parseSwapConfig(publicSwapConfig);
-const abi = [...erc20Abi, ...registryAbi, ...routerAbi, ...forkReadAbi, ...feeTokenAbi] as Abi;
+const abi = [
+  ...erc20Abi,
+  ...registryAbi,
+  ...routerAbi,
+  ...forkReadAbi,
+  ...feeTokenAbi,
+  ...liquidityAbi,
+] as Abi;
 type RpcCall = { method: string; params?: unknown[] };
-type Sent = { from: Address; to: Address; data: Hex; nonce: Hex; value: Hex; chainId: Hex };
+export type Sent = { from: Address; to: Address; data: Hex; nonce: Hex; value: Hex; chainId: Hex };
 
 class MockWallet {
   account: Address = maker;
@@ -154,23 +164,174 @@ export class SwapWallet extends MockWallet {
   fee = { rate: 200n, parts: 1_000_000n };
   closed = false;
   quoteFamilies: string[] = [];
+  quoteBonuses = new Map<Hex, bigint>();
+  positions = new Map<
+    Hex,
+    {
+      encoded?: Hex;
+      maker: Address;
+      initialized: boolean;
+      count: number;
+      reserves: Map<string, bigint>;
+      allocations: Map<string, bigint>;
+    }
+  >();
+  maxLogRange = 2000n;
+  failLogs = false;
+  initializeSeedPositions() {
+    for (const order of config.orders)
+      this.positions.set(order.hash, {
+        encoded: order.encoded,
+        maker: order.maker,
+        initialized: true,
+        count: 2,
+        reserves: new Map([
+          [config.tokens.xauh.toLowerCase(), 100n * 10n ** 18n],
+          [config.tokens.usdt.toLowerCase(), 100n * 10n ** 6n],
+        ]),
+        allocations: new Map([
+          [config.tokens.xauh.toLowerCase(), 100n * 10n ** 18n],
+          [config.tokens.usdt.toLowerCase(), 100n * 10n ** 6n],
+        ]),
+      });
+  }
   constructor() {
     super();
+    this.initializeSeedPositions();
+    for (const token of Object.values(config.tokens))
+      this.allowances.set(this.key(token, maker, config.registry), 1000n * 10n ** 18n);
     for (const account of [maker, buyer]) {
       this.balances.set(this.key(config.tokens.xauh, account), 1000n * 10n ** 18n);
       this.balances.set(this.key(config.tokens.usdt, account), 1000n * 10n ** 6n);
     }
   }
+  applyLiquidity(name: string, args: unknown[], tx: Sent) {
+    const logs: ReturnType<MockWallet["event"]>[] = [];
+    if (name === "initializeFeeOnTransfer" || name === "updateFeeOnTransferReserves") {
+      const [order, a, b, x, y] = args as [
+        { maker: Address; traits: bigint; data: Hex },
+        Address,
+        Address,
+        bigint,
+        bigint,
+      ];
+      const encoded = encodeAbiParameters([Order.ABI], [order]),
+        hash = keccak256(encoded);
+      const position = this.positions.get(hash) ?? {
+        encoded,
+        maker: order.maker,
+        initialized: false,
+        count: 0,
+        reserves: new Map(),
+        allocations: new Map(),
+      };
+      position.initialized = true;
+      position.reserves.set(a.toLowerCase(), x);
+      position.reserves.set(b.toLowerCase(), y);
+      this.positions.set(hash, position);
+      logs.push(
+        this.event(
+          name === "initializeFeeOnTransfer"
+            ? "FeeOnTransferInitialized"
+            : "FeeOnTransferReservesUpdated",
+          { orderHash: hash, maker: order.maker, token0: a, token1: b, reserve0: x, reserve1: y },
+          config.router,
+        ),
+      );
+    } else if (name === "ship") {
+      const [app, strategy, tokens, amounts] = args as [Address, Hex, Address[], bigint[]];
+      const hash = keccak256(strategy),
+        position = this.positions.get(hash)!;
+      position.count = 2;
+      tokens.forEach((token, i) => position.allocations.set(token.toLowerCase(), amounts[i]));
+      logs.push(
+        this.event(
+          "Shipped",
+          { maker: tx.from, app, strategyHash: hash, strategy },
+          config.registry,
+        ),
+      );
+    } else if (name === "push") {
+      const [owner, app, hash, token, amount] = args as [Address, Address, Hex, Address, bigint];
+      const position = this.positions.get(hash)!;
+      position.allocations.set(
+        token.toLowerCase(),
+        (position.allocations.get(token.toLowerCase()) ?? 0n) + amount,
+      );
+      const fee = sameAddress(token, config.tokens.xauh) ? tokenFee(amount, this.fee) : 0n;
+      this.balances.set(
+        this.key(token, owner),
+        (this.balances.get(this.key(token, owner)) ?? 0n) - fee,
+      );
+      this.allowances.set(
+        this.key(token, owner, config.registry),
+        this.allowance(token, owner, config.registry) - amount,
+      );
+      logs.push(this.event("Transfer", { from: owner, to: owner, value: amount - fee }, token));
+      if (fee)
+        logs.push(
+          this.event(
+            "Transfer",
+            { from: owner, to: "0x0000000000000000000000000000000000000000", value: fee },
+            token,
+          ),
+        );
+      logs.push(
+        this.event(
+          "Pushed",
+          { maker: owner, app, strategyHash: hash, token, amount },
+          config.registry,
+        ),
+      );
+    } else if (name === "dock") {
+      const [app, hash] = args as [Address, Hex];
+      const position = this.positions.get(hash)!;
+      position.count = 255;
+      for (const token of Object.values(config.tokens))
+        position.allocations.set(token.toLowerCase(), 0n);
+      logs.push(this.event("Docked", { maker: tx.from, app, strategyHash: hash }, config.registry));
+    }
+    return logs;
+  }
   output(orderData: Hex, amount: bigint, buy: boolean) {
-    const concentrated = orderData.startsWith("0x12");
+    const concentrated = AquaProgramBuilder.decode(new HexString(orderData))
+      .getInstructions()
+      .some((ix) => String(ix.opcode.id).includes("concentrateGrow"));
     const base = buy ? amount * 10n ** 12n : amount / 10n ** 12n;
-    return (base * (concentrated ? 998n : 999n)) / 1000n;
+    return (base * (concentrated ? 998n : 999n)) / 1000n + (this.quoteBonuses.get(orderData) ?? 0n);
   }
   override async handle(call: { method: string; params?: unknown[] }): Promise<unknown> {
     const { method, params = [] } = call;
     if (method === "wallet_switchEthereumChain") {
       this.chainId = Number(BigInt((params[0] as { chainId: string }).chainId));
       return null;
+    }
+    if (method === "eth_getLogs") {
+      const filter = params[0] as {
+        fromBlock: Hex;
+        toBlock: Hex;
+        address: Address;
+        topics: (Hex | Hex[] | null)[];
+      };
+      const from = BigInt(filter.fromBlock),
+        to = BigInt(filter.toBlock);
+      if (this.failLogs || to - from + 1n > this.maxLogRange)
+        throw new Error("Synthetic log range limit");
+      return [...this.receipts.values()]
+        .flatMap(
+          (receipt) => receipt.logs as { address: Address; blockNumber: Hex; topics: Hex[] }[],
+        )
+        .filter(
+          (log) =>
+            sameAddress(log.address, filter.address) &&
+            BigInt(log.blockNumber) >= from &&
+            BigInt(log.blockNumber) <= to &&
+            filter.topics.every(
+              (topic, i) =>
+                topic === null ||
+                (Array.isArray(topic) ? topic.includes(log.topics[i]) : topic === log.topics[i]),
+            ),
+        );
     }
     if (method === "eth_call") {
       this.rpcMethods.push(method);
@@ -187,7 +348,11 @@ export class SwapWallet extends MockWallet {
         case "FEE_PARTS":
           return result(this.fee.parts);
         case "feeOnTransferInitialized":
-          return result(true);
+          return result(this.positions.get(args[0] as Hex)?.initialized ?? false);
+        case "feeOnTransferReserves":
+          return result(
+            this.positions.get(args[0] as Hex)?.reserves.get(String(args[1]).toLowerCase()) ?? 0n,
+          );
         case "decimals":
           return result(sameAddress(request.to, config.tokens.usdt) ? 6 : 18);
         case "balanceOf":
@@ -195,7 +360,18 @@ export class SwapWallet extends MockWallet {
         case "allowance":
           return result(this.allowance(request.to, String(args[0]), String(args[1])));
         case "rawBalances":
-          return result([1000n * 10n ** 18n, this.closed ? 255 : 2]);
+          return result([
+            this.positions.get(args[2] as Hex)?.allocations.get(String(args[3]).toLowerCase()) ??
+              0n,
+            this.closed ? 255 : (this.positions.get(args[2] as Hex)?.count ?? 0),
+          ]);
+        case "initializeFeeOnTransfer":
+        case "updateFeeOnTransferReserves":
+        case "ship":
+        case "push":
+        case "dock":
+          if (this.simulationFails) throw new Error("Synthetic simulation revert");
+          return "0x";
         case "approve":
           return result(true);
         case "quote":
@@ -238,6 +414,12 @@ export class SwapWallet extends MockWallet {
         const [spender, value] = args as [Address, bigint];
         this.allowances.set(this.key(tx.to, tx.from, spender), value);
         logs.push(this.event("Approval", { owner: tx.from, spender, value }, tx.to));
+      } else if (
+        ["initializeFeeOnTransfer", "updateFeeOnTransferReserves", "ship", "push", "dock"].includes(
+          decoded.functionName,
+        )
+      ) {
+        logs.push(...this.applyLiquidity(decoded.functionName, args, tx));
       } else if (decoded.functionName === "swap") {
         const [order, tokenIn, tokenOut, amountIn] = args as [
           { maker: Address; traits: bigint; data: Hex },
