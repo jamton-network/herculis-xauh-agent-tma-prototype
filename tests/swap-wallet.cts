@@ -365,7 +365,14 @@ export class SwapWallet extends MockWallet {
 }
 
 export async function installSwapConfig(page: Page, reader = new SwapWallet()) {
-  await page.route("**/aqua-config", (route) => route.fulfill({ json: publicSwapConfig }));
+  await page.route(
+    /\/(?:src\/live\/aquaDeployment\.ts|assets\/aquaDeployment-[^/]+\.js)(?:\?.*)?$/,
+    (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: `export default ${JSON.stringify(publicSwapConfig)};`,
+      }),
+  );
   await page.route("**/aqua-rpc", async (route) => {
     const call = route.request().postDataJSON();
     if (["eth_sendTransaction", "eth_requestAccounts", "eth_accounts"].includes(call.method))

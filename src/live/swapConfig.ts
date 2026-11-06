@@ -132,10 +132,6 @@ export function parseSwapConfig(raw: unknown): SwapConfig {
 }
 
 export async function loadSwapConfig(): Promise<SwapConfig> {
-  const response = await fetch("/aqua-config", { cache: "no-store" });
-  if (!response.ok)
-    throw new Error(
-      "Sepolia contracts are not configured. Configure the public Aqua settings before connecting.",
-    );
-  return parseSwapConfig(await response.json());
+  const { default: deployment } = await import("./aquaDeployment");
+  return parseSwapConfig(deployment);
 }

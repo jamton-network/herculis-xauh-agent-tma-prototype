@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open the [local demo](http://127.0.0.1:4173). Use the header settings to change themes or restart onboarding. The surrounding demo works without contract settings. Live swaps require the public configuration described below.
+Open the [local demo](http://127.0.0.1:4173). Use the header settings to change themes or restart onboarding. Public Sepolia settings are included with the app, so live quotes work without additional server configuration.
 
 ## Commands
 
@@ -55,13 +55,9 @@ Buy and sell keep separate amount drafts while the screen remains open. Returnin
 
 ## Public Aqua configuration
 
-The app fetches `/aqua-config` for public Sepolia contract settings. Keep environment-specific values outside the repository. The [configuration example](aqua-config.example.json) uses synthetic contracts and orders; replace them with the intended public deployment values in an external JSON file.
+The [public Sepolia configuration](src/live/aquaDeployment.ts) is defined in source code and compiled into the application JavaScript.
 
-```sh
-AQUA_PUBLIC_CONFIG_PATH=../aqua-public-config.json npm run dev
-```
-
-The Vite development and preview servers read only the explicitly configured JSON file. Environment-file loading is disabled. The file must contain only public contract configuration, with these keys:
+To change the deployment, update this file with the intended public contract settings and rebuild. It contains:
 
 | Key                                                                              | Meaning                                                                                    |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -73,8 +69,6 @@ The Vite development and preview servers read only the explicitly configured JSO
 | `orders`                                                                         | Two objects containing ABI-encoded `encoded` orders, one for each supported pricing family |
 
 The order programs determine the pricing type. Supported programs use Aqua authorization without hooks, constant-product pricing, optional concentration, optional input fees and optional salt. Each configured order must already be initialized for fee-on-transfer accounting and shipped to Aqua with active balances for both configured tokens. This interface does not deploy contracts or add/remove liquidity.
-
-A static host must provide the same public JSON at `/aqua-config`; the build does not embed local deployment settings. Keep browser recovery data when changing configuration. Recovery storage is scoped by chain and router, and records the registry identity. Changing a deployment does not migrate or resolve operations from another deployment.
 
 ## Wallet and swap workflow
 
@@ -123,7 +117,7 @@ If local cache or output directories are unavailable, `VITE_CACHE_DIR` and `PLAY
 
 ## Deployment
 
-GitHub Actions validates pull requests targeting `main` and pushes to `main`. Successful upstream pushes to `main` publish the validated static build. Publication requires separate authorization; public runtime configuration must also be supplied by the host.
+GitHub Actions validates pull requests targeting `main` and pushes to `main`. Successful upstream pushes to `main` publish the validated static build. Publication requires separate authorization.
 
 ## License
 
