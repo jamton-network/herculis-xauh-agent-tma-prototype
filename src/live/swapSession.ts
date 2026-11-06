@@ -218,10 +218,43 @@ export class SwapSession {
       }
     };
     window.addEventListener("storage", changed);
+    let active = true,
+      polling = false;
+    const pollWallet = async () => {
+      const provider = this.provider;
+      if (!active || polling || !provider || !this.walletEnabled || document.hidden) return;
+      polling = true;
+      const generation = this.generation;
+      try {
+        const [chain, accounts] = await Promise.all([
+          provider.request({ method: "eth_chainId" }),
+          provider.request({ method: "eth_accounts" }),
+        ]);
+        if (!active || !this.walletEnabled || generation !== this.generation) return;
+        const chainId = typeof chain === "string" ? Number(BigInt(chain)) : 0;
+        const account =
+          Array.isArray(accounts) && typeof accounts[0] === "string" && isAddress(accounts[0])
+            ? getAddress(accounts[0])
+            : undefined;
+        if (chainId !== this.state.chainId || account !== this.state.account) this.contextChanged();
+      } catch {
+        if (active && this.walletEnabled && generation === this.generation) this.contextChanged();
+      } finally {
+        polling = false;
+      }
+    };
+    const visible = () => void pollWallet();
+    const walletTimer = window.setInterval(pollWallet, 5000);
+    window.addEventListener("focus", pollWallet);
+    document.addEventListener("visibilitychange", visible);
     return () => {
+      active = false;
       for (const event of ["accountsChanged", "chainChanged", "disconnect"])
         this.provider?.removeListener?.(event, this.contextChanged);
       window.removeEventListener("storage", changed);
+      window.removeEventListener("focus", pollWallet);
+      window.clearInterval(walletTimer);
+      document.removeEventListener("visibilitychange", visible);
       this.invalidateQuotes();
     };
   }
@@ -257,6 +290,7 @@ export class SwapSession {
           "needs-review",
         ].includes(operation.status) ||
         (operation.hash && !/^0x[\da-f]{64}$/i.test(operation.hash)) ||
+        (operation.receiptBlockHash && !/^0x[\da-f]{64}$/i.test(operation.receiptBlockHash)) ||
         operationIdentity(this.config, operation) !== operation.id
       )
         throw new Error("Invalid recovery operation.");
@@ -720,15 +754,43 @@ export class SwapSession {
   }
 
   private async checkConfirmed() {
-    for (const operation of this.state.operations.filter(
+    const operations = this.state.operations.filter(
       (item) => item.hash && ["confirmed", "reverted", "replaced"].includes(item.status),
-    )) {
-      const receipt = await this.client.getTransactionReceipt({ hash: operation.hash! });
-      const block = await this.client.getBlock({ blockNumber: receipt.blockNumber });
-      if (receipt.blockHash !== block.hash) {
-        this.replace({ ...operation, status: "needs-review" });
-        throw new Error("A previous receipt changed. Reconcile it before continuing.");
-      }
+    );
+    if (!operations.length) return;
+    const head = await this.client.getBlockNumber();
+    const blocks = new Map<bigint, Promise<Hex | null>>();
+    for (let offset = 0; offset < operations.length; offset += 4) {
+      const results = await Promise.allSettled(
+        operations.slice(offset, offset + 4).map(async (operation) => {
+          const receipt = await this.client
+            .getTransactionReceipt({ hash: operation.hash! })
+            .catch(() => undefined);
+          if (!receipt) {
+            this.replace({ ...operation, status: "needs-review" });
+            throw new Error(
+              "A previous receipt is no longer available. Reconcile it before continuing.",
+            );
+          }
+          let block = blocks.get(receipt.blockNumber);
+          if (!block) {
+            block = this.client
+              .getBlock({ blockNumber: receipt.blockNumber })
+              .then((value) => value.hash);
+            blocks.set(receipt.blockNumber, block);
+          }
+          if (
+            receipt.blockHash !== (await block) ||
+            head - receipt.blockNumber + 1n < 2n ||
+            (operation.receiptBlockHash && operation.receiptBlockHash !== receipt.blockHash)
+          ) {
+            this.replace({ ...operation, status: "needs-review" });
+            throw new Error("A previous receipt changed. Reconcile it before continuing.");
+          }
+        }),
+      );
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) throw failure.reason;
     }
   }
 
@@ -827,7 +889,12 @@ export class SwapSession {
         } else {
           try {
             const evidence = receiptSummary(this.config, operation, receipt);
-            this.replace({ ...operation, status: "confirmed", evidence });
+            this.replace({
+              ...operation,
+              status: "confirmed",
+              evidence,
+              receiptBlockHash: receipt.blockHash,
+            });
           } catch {
             this.replace({
               ...operation,

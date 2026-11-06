@@ -66,6 +66,7 @@ export type SwapOperation = {
   hash?: Hex;
   evidence?: string;
   feeRate?: { rate: string; parts: string };
+  receiptBlockHash?: Hex;
 };
 export const isUnresolved = (operation: SwapOperation) =>
   ["awaiting-wallet", "ambiguous", "pending", "needs-review"].includes(operation.status);

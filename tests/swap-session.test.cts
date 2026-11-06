@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { decodeFunctionData, erc20Abi } from "viem";
 import { SwapSession } from "../src/live/swapSession";
 import { feeBreakdown, minReceipt, parseAmount, routerAbi } from "../src/live/swapModel";
-import { config, SwapWallet } from "./swap-wallet.cjs";
+import { config, maker, SwapWallet } from "./swap-wallet.cjs";
 
 test.beforeAll(() => {
   Object.defineProperty(navigator, "locks", {
@@ -90,6 +90,141 @@ for (const direction of ["instant-buy", "instant-sell"] as const)
       );
     });
   }
+
+test("a settled history can be checked without expiring a fresh swap quote", async () => {
+  const h = harness();
+  await h.session.connect();
+  await h.session.quote("instant-buy", "1", "50");
+  await h.session.approve("constant-product", false, "usdt");
+  await h.session.reconcile();
+  await h.session.approve("constant-product", true, "usdt");
+  await h.session.reconcile();
+  await h.session.quote("instant-buy", "1", "50");
+  await h.session.approve("constant-product", false, "usdt");
+  await h.session.reconcile();
+  await h.session.quote("instant-buy", "1", "50");
+  const request = h.provider.request;
+  const realNow = Date.now;
+  const start = realNow();
+  let elapsed = 0;
+  let inFlight = 0;
+  h.provider.request = async (call) => {
+    if (call.method !== "eth_getTransactionReceipt") return request(call);
+    if (!inFlight) elapsed += 40_000;
+    inFlight++;
+    try {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      return await request(call);
+    } finally {
+      inFlight--;
+    }
+  };
+  Date.now = () => start + elapsed;
+  try {
+    await h.session.swap("constant-product");
+    expect(h.wallet.sends, h.session.state.message).toHaveLength(4);
+    expect(h.session.state.operations.at(-1)?.status).toBe("pending");
+  } finally {
+    Date.now = realNow;
+    h.provider.request = request;
+  }
+});
+
+test("a failed receipt audit waits for in-flight checks before releasing the transaction lock", async () => {
+  const h = harness();
+  await h.session.connect();
+  await h.session.quote("instant-buy", "1", "50");
+  await h.session.approve("constant-product", false, "usdt");
+  await h.session.reconcile();
+  await h.session.approve("constant-product", true, "usdt");
+  await h.session.reconcile();
+  await h.session.quote("instant-buy", "1", "50");
+  const [first, second] = h.session.state.operations;
+  h.wallet.receipts.get(first.hash!)!.blockHash = `0x${"b".repeat(64)}`;
+  const request = h.provider.request;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let waiting = false;
+  h.provider.request = async (call) => {
+    if (
+      call.method === "eth_getTransactionReceipt" &&
+      (call.params as unknown[])[0] === second.hash
+    ) {
+      waiting = true;
+      await gate;
+    }
+    return request(call);
+  };
+  const swap = h.session.swap("constant-product");
+  try {
+    await expect.poll(() => waiting, { timeout: 2500 }).toBe(true);
+    expect(h.session.state.busy).toBe(true);
+    await h.session.approve("constant-product", true, "usdt");
+    expect(h.wallet.sends).toHaveLength(2);
+  } finally {
+    release();
+    await swap;
+    h.provider.request = request;
+  }
+  expect(h.session.state.busy).toBe(false);
+  expect(h.session.state.operations.find((op) => op.id === first.id)?.status).toBe("needs-review");
+  expect(h.wallet.sends).toHaveLength(2);
+});
+
+test("connected wallet context stays current when provider events are missing", async () => {
+  const h = harness();
+  await h.session.connect();
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const timers = new Map<number, () => unknown>();
+  const fakeWindow = Object.assign(new EventTarget(), {
+    setInterval(handler: () => unknown, delay: number) {
+      timers.set(delay, handler);
+      return delay;
+    },
+    clearInterval(delay: number) {
+      timers.delete(delay);
+    },
+  });
+  const fakeDocument = Object.assign(new EventTarget(), { hidden: false });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: fakeWindow });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: fakeDocument });
+  let stop: (() => void) | undefined;
+  try {
+    stop = h.session.listen();
+    await h.session.quote("instant-buy", "1", "50");
+    expect(h.session.state.estimates.some((item) => item.quote)).toBe(true);
+    const check = timers.get(5000);
+    expect(check).toBeDefined();
+    const originalAccount = h.wallet.account;
+    h.wallet.account = maker;
+    await check!();
+    await expect.poll(() => h.session.state.account).toBe(maker);
+    await expect.poll(() => h.session.state.busy).toBe(false);
+    expect(h.session.state.estimates).toEqual([]);
+    expect(h.wallet.sends).toHaveLength(0);
+    fakeDocument.hidden = true;
+    h.wallet.account = originalAccount;
+    const hiddenCalls = h.wallet.rpcMethods.length;
+    await check!();
+    expect(h.wallet.rpcMethods).toHaveLength(hiddenCalls);
+    expect(h.session.state.account).toBe(maker);
+    fakeDocument.hidden = false;
+    fakeWindow.dispatchEvent(new Event("focus"));
+    await expect.poll(() => h.session.state.account).toBe(originalAccount);
+    await expect.poll(() => h.session.state.busy).toBe(false);
+    h.session.disconnect();
+    const disconnectedCalls = h.wallet.rpcMethods.length;
+    await check!();
+    expect(h.wallet.rpcMethods).toHaveLength(disconnectedCalls);
+  } finally {
+    stop?.();
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
 
 test("wrong chain, changed quotes, unsupported liquidity and failed simulation send no transaction", async () => {
   const h = harness();

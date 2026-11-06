@@ -81,6 +81,8 @@ The order programs determine the pricing type. Supported programs use Aqua autho
 
 Public quotes use the configured RPC and require no wallet permission or balance. Anonymous quotes cannot authorize approvals or swaps. Connecting or changing accounts invalidates earlier quotes; executable quotes must be bound to the connected account. Every write still rechecks wallet identity, chain, balances, allowance, simulation and deadline. Automatic refresh performs read-only RPC calls.
 
+Connected sessions also check account and network context every five seconds while visible and when the window regains focus. This keeps the display current when an injected provider omits change events. These checks pause after disconnect and never request account permission or signatures.
+
 The recommendation compares token output after listed swap and transfer fees. Network fees are additional and estimated by the wallet, so the highlighted option is not a comparison of total costs including gas. No synthetic reference price or fixed payment fee is applied.
 
 ### Token fees
@@ -97,7 +99,7 @@ The app persists a public transaction identity before opening the wallet: chain,
 
 After reload, reconnect the submitting account and reconcile the pending operation. A hashless submission scans up to 40 mined blocks per action. Attach its transaction or replacement hash to locate it directly. A matching nonce with different calldata is a replacement, not a successful execution of the requested action. An absent receipt never authorizes resubmission. Resolve an unmined nonce in the wallet and reconcile its hash.
 
-Only public operations are persisted. Quotes, balances and wallet credentials are not saved. Existing recovery journals are not cleared when navigating, selecting another strategy or refreshing the app. Previously confirmed receipts are checked for canonical block identity before another write.
+Only public operations are persisted. Quotes, balances and wallet credentials are not saved. Existing recovery journals are not cleared when navigating, selecting another strategy or refreshing the app. Previously confirmed receipts are checked for canonical block identity before another write. These read-only checks use bounded concurrent batches and reuse block headers within each audit to preserve quote validity as transaction history grows. The transaction lock remains held until all in-flight checks finish, including when one fails.
 
 ## Development and validation
 
