@@ -51,6 +51,84 @@ img {
   outline-offset: 3px;
 }
 
+.live-card,
+.live-warning,
+.live-message {
+  margin: 16px 0;
+  border: 1px solid var(--tg-separator);
+  border-radius: 18px;
+  padding: 20px;
+  overflow-wrap: anywhere;
+}
+.live-card {
+  background: var(--tg-surface);
+}
+.live-warning {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+}
+.live-message {
+  background: var(--tg-surface-strong);
+}
+.live-facts {
+  margin: 16px 0;
+}
+.live-facts > div {
+  margin: 10px 0;
+}
+.live-facts dt {
+  font-size: 13px;
+  color: var(--tg-text-secondary);
+}
+.live-facts dd {
+  margin: 2px 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.live-note {
+  color: var(--tg-text-secondary);
+  font-size: 13px;
+}
+.live-address {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.live-fields {
+  margin: 16px 0;
+}
+.live-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.live-fields input {
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--tg-text);
+  background: var(--tg-bg);
+  border: 1px solid var(--tg-separator);
+  border-radius: 8px;
+}
+.live-transactions {
+  padding-inline-start: 24px;
+}
+.live-transactions li {
+  margin: 18px 0;
+}
+.live-transactions li > span,
+.live-transactions li > a {
+  display: block;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .live-card,
+  .live-warning,
+  .live-message {
+    padding: 16px;
+  }
+}
+
 .app-shell,
 :root,
 :root[data-theme="light"] {
@@ -2550,4 +2628,137 @@ img {
   .tab-button {
     font-size: 12px;
   }
+}
+
+.swap-network-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--tg-text-secondary);
+  margin: 1rem 0 1.5rem;
+}
+
+.swap-network-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tg-link);
+}
+
+.strategy-options .strategy-option--soon {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.strategy-option--soon em {
+  color: var(--tg-text-secondary);
+  font-style: normal;
+}
+
+.execution-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.execution-choice input {
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
+  accent-color: var(--gold);
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.execution-choice > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.execution-choice strong,
+.execution-choice small {
+  display: block;
+}
+
+.execution-choice strong {
+  font-size: 1.1rem;
+}
+
+.execution-choice small {
+  margin-top: 0.35rem;
+  color: var(--tg-text-secondary);
+}
+
+.execution-choice em {
+  font-size: 0.8rem;
+  font-style: normal;
+  color: var(--tg-text-secondary);
+}
+
+.execution-option.is-selected {
+  border-color: var(--tg-link);
+  box-shadow: 0 0 0 1px var(--tg-link);
+}
+
+.execution-option.is-recommended .execution-choice small {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.execution-option .execution-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.execution-option .execution-metrics dd,
+.execution-details dd,
+.live-facts dd {
+  overflow-wrap: anywhere;
+}
+
+.swap-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.swap-action-buttons .button--primary {
+  grid-column: 1 / -1;
+}
+
+.swap-wallet-section .live-card {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 540px) {
+  .swap-action-buttons,
+  .execution-option .execution-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .execution-choice {
+    flex-wrap: wrap;
+  }
+
+  .execution-choice em {
+    margin-left: 1.875rem;
+  }
+}
+
+.execution-option.is-recommended {
+  background: var(--gold-soft);
+}
+
+.strategy-input-wrap:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--tg-link) 40%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .strategy-input-wrap input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+.strategy-input-wrap input {
+  border-radius: 0;
 }

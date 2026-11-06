@@ -8,7 +8,7 @@ Use the [README](README.md) to install dependencies and run the app. Keep change
 - Put synthetic data in [fixtures](src/demo/fixtures.ts) and shared types in [types](src/types.ts).
 - Use native scrolling and form controls. Keep dialogs accessible and both themes readable.
 - Keep the app responsive from 320px through desktop widths and respect safe areas and reduced motion.
-- Keep all integrations simulated. Do not add credentials, real wallet addresses, personal data, internal URLs, or deployment identifiers.
+- Keep synthetic demo integrations simulated. Isolate Sepolia Aqua swaps in [live modules](src/live/) and the [swap panel](src/components/AquaSwapPanel.tsx). Every approval, reset and swap requires an explicit action and browser wallet confirmation. Share the real wallet session across the External wallet card and Aqua swaps. Clear quotes when input, direction, account or chain changes. Public price previews must work without wallet permission, never authorize writes, and pause automatic polling in background pages or during unresolved transactions. Keep public deployment settings outside the repository, use runtime wallet inputs and preserve transaction recovery journals. Do not add credentials, personal wallet addresses, personal data or internal infrastructure details.
 - Prefer descriptive code over explanatory comments. Preserve any required dependency license notices.
 
 ## Linting and formatting

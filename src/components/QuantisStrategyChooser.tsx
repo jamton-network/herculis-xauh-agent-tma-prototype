@@ -35,7 +35,7 @@ export function QuantisStrategyChooser({
         Choose randomly with Quantis
       </button>
       <p id="quantis-repeat-note">
-        Each strategy has a 25% chance. The same choice can appear again.
+        Instant buy and Instant sell each have a 50% chance. The same choice can appear again.
       </p>
       <p
         className="quantis-result"

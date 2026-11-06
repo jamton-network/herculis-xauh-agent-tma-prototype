@@ -4,7 +4,8 @@ const isCI = Boolean(process.env.CI);
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "**/*.test.ts",
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR ?? "test-results",
+  testMatch: "**/*.test.{ts,cts}",
   fullyParallel: true,
   forbidOnly: isCI,
   workers: isCI ? 2 : 4,

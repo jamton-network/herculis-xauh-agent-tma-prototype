@@ -29,8 +29,9 @@ export function QuantisInfoSheet({
         <div className="quantis-info-copy">
           <h3>Random strategy selection</h3>
           <p>
-            A random choice is another way to explore the four strategies. Review the choice and
-            adjust its settings before saving.
+            The simulated chooser selects Instant buy or Instant sell with equal probability. Review
+            the choice and enter the swap amount before requesting a quote. Choosing a strategy
+            never connects a wallet or submits a transaction.
           </p>
         </div>
         <div className="quantis-info-links">

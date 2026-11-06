@@ -1,3 +1,5 @@
+import { demoWallets } from "../src/demo/fixtures";
+import { installSwapConfig } from "./swap-wallet.cjs";
 import { expect, test, type Page } from "@playwright/test";
 
 const lightSheetTheme = {
@@ -60,16 +62,18 @@ async function openWallets(page: Page) {
 }
 
 async function connectWallet(page: Page) {
-  await page.getByTestId("connect-wallet").click();
+  await page.getByTestId("top-up-wallet").click();
   await expect(page.getByRole("heading", { name: "Connect your Ethereum wallet" })).toBeVisible();
   await page.getByTestId("verify-wallet").click();
-  await expect(page.getByText("Verified", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("toast")).toContainText("External wallet verified");
 }
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/?theme=light");
   await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", "light");
 });
+
+test.beforeEach(async ({ page }) => installSwapConfig(page));
 
 test("four-tab navigation keeps the product architecture visible", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "No purchase yet today" })).toBeVisible();
@@ -116,7 +120,7 @@ test("onboarding explains one agent wallet and keeps external-wallet connection 
 
 test("wallet ownership states and a confirmed USDT top-up are interactive", async ({ page }) => {
   await openWallets(page);
-  await page.getByTestId("connect-wallet").click();
+  await page.getByTestId("top-up-wallet").click();
   await expectOpaqueSheet(page);
   await page.getByRole("button", { name: "Wrong network" }).click();
   await expect(page.getByRole("heading", { name: "Ethereum Mainnet required" })).toBeVisible();
@@ -295,46 +299,19 @@ test("representative multi-asset withdrawal flow emits no browser errors", async
   expect(errors).toEqual([]);
 });
 
-test("four trading strategies preserve drafts and support save, pause, resume, and removal", async ({
+test("the strategy selector enables instant swaps and marks future rules Soon", async ({
   page,
 }) => {
   await page.getByTestId("review-strategy").click();
-  await expect(page.getByRole("heading", { name: "Trading strategy" })).toBeVisible();
-  await expect(page.getByTestId("strategy-target-price")).toBeChecked();
-  await expect(page.getByLabel("Purchase amount")).toHaveValue("50");
-  await expect(page.getByLabel("Buy at or below")).toHaveValue("130");
-  await expect(page.getByText("24 hours", { exact: true })).toBeVisible();
-
-  await page.getByTestId("strategy-weekly-dca").click();
-  await expect(page.getByLabel("Day")).toHaveValue("Friday");
-  await expect(page.getByLabel("Local time")).toHaveValue("10:00");
-  await page.getByLabel("Purchase amount").fill("75");
-
-  await page.getByTestId("strategy-reserve-buy").click();
-  await expect(page.getByLabel("Keep at least")).toHaveValue("200");
-  await page.getByTestId("strategy-dip-buy").click();
-  await expect(page.getByLabel("Drop from recent high")).toHaveValue("2");
-  await expect(page.getByLabel("Recent-high window")).toHaveValue("7");
-  await expect(page.getByText("Once every 7 days", { exact: true })).toBeVisible();
-
-  await page.getByTestId("strategy-weekly-dca").click();
-  await expect(page.getByLabel("Purchase amount")).toHaveValue("75");
-  await expect(page.getByLabel("Maximum per purchase")).toHaveValue("250");
-  await expect(page.getByLabel("Daily budget")).toHaveValue("500");
-  await expect(page.getByLabel("Monthly budget")).toHaveValue("2000");
-  await expect(page.getByLabel("Minimum balance")).toHaveValue("200");
-  await expect(page.getByLabel("Maximum price markup")).toHaveValue("0.8");
-  await page.getByRole("button", { name: "Save strategy" }).click();
-  await expect(page.getByTestId("toast")).toContainText("Trading strategy saved");
-
-  await page.getByRole("button", { name: "Pause strategy" }).click();
-  await expect(page.getByRole("heading", { name: "Strategy is paused" })).toBeVisible();
-  await page.getByRole("button", { name: "Resume strategy" }).click();
-  await expect(page.getByRole("heading", { name: "Strategy is active" })).toBeVisible();
-  await page.getByRole("button", { name: "Remove strategy" }).click();
-  await expectOpaqueSheet(page);
-  await page.getByRole("button", { name: "Remove strategy", exact: true }).last().click();
-  await expect(page.getByRole("heading", { name: "No strategy saved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Trading strategy", exact: true })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Instant buy", exact: true })).toBeChecked();
+  for (const name of ["Target price buy", "Weekly DCA", "Reserve buy", "Dip buy"])
+    await expect(page.getByRole("radio", { name, exact: true })).toBeDisabled();
+  await expect(page.getByText("Soon", { exact: true })).toHaveCount(4);
+  await page.getByRole("radio", { name: "Instant sell", exact: true }).check();
+  await expect(page.getByLabel("XAUH to sell", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save strategy", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Strategy workspace" })).toHaveCount(0);
 });
 
 test("activity separates purchases and transfers and preserves delivery pending", async ({
@@ -373,21 +350,13 @@ test("wallets copy synthetic addresses and show equal top-up controls", async ({
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(agentValue);
 
   await connectWallet(page);
-  const externalAddress = page.getByRole("button", { name: "Copy external wallet address" });
-  const externalValue = (await externalAddress.innerText()).trim();
-  expect(externalValue).toMatch(/^0x[0-9a-f]{40}$/);
-  expect(externalValue).not.toBe(agentValue);
-  await externalAddress.click();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(externalValue);
-
+  const externalValue = demoWallets.external;
+  await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
   for (const width of [320, 375, 393, 427]) {
     await page.setViewportSize({ width, height: 852 });
-    for (const address of [agentAddress, externalAddress]) {
-      const overflow = await address.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      );
-      expect(overflow).toBeLessThanOrEqual(1);
-    }
+    expect(
+      await agentAddress.evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
   }
 
   await page.getByTestId("top-up-wallet").click();
@@ -413,7 +382,7 @@ test("wallets copy synthetic addresses and show equal top-up controls", async ({
   await openWallets(page);
   await expect(agentAddress).toHaveText(agentValue);
   await connectWallet(page);
-  await expect(externalAddress).toHaveText(externalValue);
+  await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
 });
 
 test("home shows the reference rate and agent-state controls", async ({ page }) => {
@@ -447,7 +416,7 @@ test("dark theme preserves readable foregrounds and chat-card spacing", async ({
   });
 
   await page.goto("/?theme=dark&view=strategy");
-  await expect(page.locator(".strategy-screen .risk-note p")).toHaveCSS(
+  await expect(page.locator(".strategy-screen .swap-network-note")).toHaveCSS(
     "color",
     "rgb(187, 197, 213)",
   );
@@ -500,7 +469,7 @@ test("theme controls, focus visibility, and representative widths remain usable"
   await expect(page.getByTestId("tab-chat")).toBeFocused();
 });
 
-test("Ethereum onboarding connection persists and disconnect restores transfer gating", async ({
+test("simulated onboarding connection stays separate from the real external wallet", async ({
   page,
 }) => {
   await page.getByTestId("settings-trigger").click();
@@ -514,16 +483,10 @@ test("Ethereum onboarding connection persists and disconnect restores transfer g
   await page.getByTestId("onboarding-next").click();
   await page.getByTestId("onboarding-next").click();
   await openWallets(page);
-  await expect(page.getByText("Verified", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ethereum", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Disconnect wallet" }).click();
   await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
-  for (const action of ["top-up-wallet", "withdraw-wallet"]) {
-    await page.getByTestId(action).click();
-    await expect(page.getByRole("dialog")).toHaveAccessibleName("Connect your Ethereum wallet");
-    await page.keyboard.press("Escape");
-  }
-  await connectWallet(page);
+  await expect(page.getByTestId("connect-aqua-wallet")).toBeEnabled();
+  await page.getByTestId("top-up-wallet").click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Top up agent wallet");
 });
 
 test("fixed ETH withdrawals reserve gas and preserve the reviewed recipient amount", async ({

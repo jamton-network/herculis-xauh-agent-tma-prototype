@@ -85,7 +85,7 @@ export default function App() {
   );
   const [showStrategy, setShowStrategy] = useState(() => {
     const requestedView = new URLSearchParams(window.location.search).get("view");
-    return requestedView === "strategy";
+    return requestedView === "strategy" || requestedView === "aqua";
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [agentStateOpen, setAgentStateOpen] = useState(false);
@@ -108,6 +108,10 @@ export default function App() {
   const closeStrategy = () => {
     restoreStrategyFocus.current = true;
     setShowStrategy(false);
+  };
+
+  const openStrategy = () => {
+    setShowStrategy(true);
   };
 
   const effectiveTheme = useMemo(() => {
@@ -251,30 +255,10 @@ export default function App() {
       <BrandHeader onOpenSettings={() => setSettingsOpen(true)} />
       {showStrategy ? (
         <div key="strategy" className="app-scroll">
-          <TradingStrategyScreen
-            agentMode={agentMode}
-            savedConfiguration={strategyConfiguration}
-            onBack={closeStrategy}
-            onSave={(configuration) => {
-              if (!strategyConfiguration.selectedStrategy) setAgentMode("paused");
-              setStrategyConfiguration(structuredClone(configuration));
-              notify("Trading strategy saved");
-            }}
-            onPause={() => {
-              if (!strategyConfiguration.selectedStrategy) return;
-              setAgentMode((mode) => (mode === "paused" ? "monitoring" : "paused"));
-              notify(
-                agentMode === "paused" ? "Trading strategy resumed" : "Trading strategy paused",
-              );
-            }}
-            onRemove={() => setConfirmAction("remove-strategy")}
-          />
+          <TradingStrategyScreen onBack={closeStrategy} />
         </div>
       ) : activeTab === "chat" ? (
-        <ChatScreen
-          onOpenStrategy={() => setShowStrategy(true)}
-          notify={() => notify("Message sent")}
-        />
+        <ChatScreen onOpenStrategy={openStrategy} notify={() => notify("Message sent")} />
       ) : (
         <div key={activeTab} className="app-scroll">
           {activeTab === "home" ? (
@@ -283,23 +267,13 @@ export default function App() {
               savedStrategyTitle={savedStrategyTitle}
               savedLimits={strategyConfiguration.limits}
               onOpenAgentState={() => setAgentStateOpen(true)}
-              onOpenStrategy={() => setShowStrategy(true)}
+              onOpenStrategy={openStrategy}
               onChangeTab={changeTab}
               onOpenActivity={setSelectedActivity}
               onTopUp={openTopUp}
             />
           ) : activeTab === "wallets" ? (
-            <WalletsScreen
-              connectedWallet={connectedWallet}
-              onConnect={openConnect}
-              onDisconnect={() => {
-                setConnectedWallet("disconnected");
-                notify("External wallet disconnected");
-              }}
-              onTopUp={openTopUp}
-              onWithdraw={openWithdraw}
-              onCopy={copy}
-            />
+            <WalletsScreen onTopUp={openTopUp} onWithdraw={openWithdraw} onCopy={copy} />
           ) : (
             <ActivityScreen
               filter={activityFilter}
