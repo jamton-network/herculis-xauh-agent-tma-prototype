@@ -288,9 +288,11 @@ test("browser preview viewport mismatch does not truncate the full-page app", as
   expect(nav!.y + nav!.height).toBe(900);
 });
 
-test("Ethereum connection dialog supports keyboard navigation and dismissal", async ({ page }) => {
+test("demo wallet connection dialog supports keyboard navigation and dismissal", async ({
+  page,
+}) => {
   await page.goto("/?tab=wallets");
-  const trigger = page.getByRole("button", { name: "Connect Ethereum wallet" });
+  const trigger = page.getByTestId("top-up-wallet");
   await trigger.focus();
   await trigger.press("Enter");
   const dialog = page.getByRole("dialog");
