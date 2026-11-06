@@ -1,19 +1,19 @@
 # Herculis XAUH Agent
 
-An interactive, responsive demo of a gold-token agent experience. Explore Home, Chat, Wallets, Activity, onboarding, and four trading strategies in light or dark mode.
+A responsive gold-token agent demo with Home, Chat, Wallets, Activity, onboarding and wallet-confirmed Aqua swaps on Sepolia.
 
-All balances, wallet addresses, messages, and transactions are synthetic. The demo does not connect to wallets, blockchains, Telegram, models, or a backend. Reloading resets the session. The displayed XAUH price is a demo reference value.
+Home, Chat, Activity and the agent wallet use simulated balances, addresses, messages and transactions. The External wallet card shares the real Sepolia wallet connection with Aqua swaps. Reloading resets that demo session. **Trading strategy** provides a separate live **Instant buy / Instant sell** flow for XAUH and USDT. Its amounts, balances, fees and quotes come from user inputs and Sepolia contracts; simulated demo values never authorize live transactions.
 
 ## Run locally
 
-Use Node.js 20.19+ in the 20.x series, or Node.js 22.12+ (Node.js 24 recommended), and npm.
+Use Node.js 22.12+ and npm. Node.js 24 is recommended.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open the [local demo](http://127.0.0.1:4173). Open **Settings** using the gear button on the right side of the header to change themes, restart onboarding, or choose **Activity states** to explore additional demo states.
+Open the [local demo](http://127.0.0.1:4173). Use the header settings to change themes or restart onboarding. Public Sepolia settings are included with the app, so live quotes work without additional server configuration.
 
 ## Commands
 
@@ -39,57 +39,85 @@ npm run validate
 
 ## Entry routes
 
-- `/?theme=light` or `/?theme=dark` selects a theme; the default follows the system.
-- `/?tab=home`, `/?tab=chat`, `/?tab=wallets`, or `/?tab=activity` opens a tab.
-- `/?view=strategy` opens the strategy editor.
+- `/?theme=light` or `/?theme=dark` selects a theme; otherwise the system theme applies.
+- `/?tab=home`, `/?tab=chat`, `/?tab=wallets` and `/?tab=activity` open the main screens. The Wallets screen combines a simulated agent wallet with the real external-wallet connection.
+- `/?view=strategy` opens the integrated swap selector.
+- The previous `/?view=aqua` and `/?view=strategy&section=liquidity` links also open the integrated selector. They no longer open a separate liquidity tab.
 - `/#onboarding` opens onboarding.
 
-## Trading strategy demo
+## Trading strategy
 
-Choose a strategy manually or use **Choose randomly with Quantis**. This is a local simulation: no Quantis device is connected. Each of the four strategies has a 25% chance on every draw, including the current choice. Random selection only changes the editor draft.
+**Instant buy** spends an exact USDT amount for XAUH. **Instant sell** spends an exact XAUH amount for USDT. Target price buy, Weekly DCA, Reserve buy and Dip buy remain visible with **Soon** labels and disabled native radio inputs.
 
-**Save strategy** keeps the selection, each strategy's parameters, and shared purchase limits for the current session. Leaving the editor discards unsaved changes. Pause and Resume apply to the saved strategy without saving the draft. Saving keeps the current operating mode.
+**Choose randomly with Quantis** is a local simulation without a connected Quantis device. It selects only Instant buy or Instant sell, with a 50% chance each; repeated choices are allowed. It never connects a wallet, approves tokens or submits a swap.
 
-**Remove strategy** discards unsaved changes and removes the saved selection, while retaining saved parameters and limits. After saving a new strategy, use **Resume strategy** to enable demo monitoring. Restarting onboarding preserves the saved configuration and operating mode; reloading resets the entire session.
+Buy and sell keep separate amount drafts while the screen remains open. Returning to the surrounding demo discards these inputs and quotes, while submitted operations remain in recovery storage. Save, Pause, Resume and Remove controls are not part of the instant swap workflow. The surrounding agent status and Activity remain simulated.
 
-## Aqua execution comparison
+## Public Aqua configuration
 
-**Execution via Aqua** compares a single full USDT → XAUH purchase under the current editor settings. The agent recommends an option and explains its choice; **Compare options** shows alternatives without a manual override. Manual and Quantis selection use the same calculation. Editing recalculates immediately, while Save keeps only the strategy configuration. Back discards the draft. An unavailable recommendation does not prevent saving a rule for future conditions.
+The [public Sepolia configuration](src/live/aquaDeployment.ts) is defined in source code and compiled into the application JavaScript.
 
-The two [execution offers](src/demo/executionFixtures.ts) represent Constant-product AMM and Concentrated-liquidity AMM families. A trading rule, a SwapVM program family, and a particular liquidity position are distinct concepts. Target price buy constrains the effective price; Reserve buy uses the larger of its own reserve and the shared minimum balance. Weekly DCA and Dip buy describe when a purchase is eligible. Their schedule, drop percentage, and lookback do not change the price curve. This comparison does not monitor markets, calculate a historical high, or determine whether a trigger or interval has elapsed.
+To change the deployment, update this file with the intended public contract settings and rebuild. It contains:
 
-The [SwapVM catalog](https://github.com/1inch/swap-vm/blob/feb16411738331f7d05ae71d4a664154068018fc/docs/PROGRAMS.md) distinguishes one-direction limit programs from bidirectional AMM programs. Aqua-backed settlement is a separate authorization and balance mode. The selected [Aqua opcode set](https://github.com/1inch/swap-vm/blob/feb16411738331f7d05ae71d4a664154068018fc/contracts/opcodes/AquaOpcodes.sol) includes both AMM primitives. This app builds no bytecode, ships no positions, and connects to no router or quote service. The local model does not reproduce SwapVM's complete arithmetic or settlement behavior. Limit orders, pegged curves, partial fills, split routing, fee-on-transfer, and real transactions are outside this comparison.
+| Key                                                                              | Meaning                                                                                    |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `rpcUrl`                                                                         | Public Sepolia HTTP JSON-RPC endpoint, or a same-origin path to a read-only RPC service    |
+| `chainId`                                                                        | Ethereum Sepolia, `11155111`                                                               |
+| `router`, `registry`                                                             | SwapVM fork and its Aqua registry                                                          |
+| `tokens.xauh`, `tokens.usdt`                                                     | ERC-20 token contracts                                                                     |
+| `codeHashes.router`, `codeHashes.registry`, `codeHashes.xauh`, `codeHashes.usdt` | Keccak-256 fingerprints of the expected deployed runtime bytecode                          |
+| `orders`                                                                         | Two objects containing ABI-encoded `encoded` orders, one for each supported pricing family |
 
-### Calculation and fixture assumptions
+The order programs determine the pricing type. Supported programs use Aqua authorization without hooks, constant-product pricing, optional concentration, optional input fees and optional salt. Each configured order must already be initialized for fee-on-transfer accounting and shipped to Aqua with active balances for both configured tokens. This interface does not deploy contracts or add/remove liquidity.
 
-All options share one fixed reference context: Ethereum, 825.40 USDT available, zero spent today/this month, 130 USD/XAUH reference price, and an assumed 1 USDT = 1 USD. These are independent synthetic inputs, not data inferred from Activity or a live wallet. Neither comparison nor Save changes balances, spend counters, or history.
+## Wallet and swap workflow
 
-| Offer                      | Pricing reserves X (USDT), Y (XAUH) | Input swap fee | Additional limits                                                                          |
-| -------------------------- | ----------------------------------- | -------------- | ------------------------------------------------------------------------------------------ |
-| Constant-product AMM       | 50,000; 390.625                     | 0.05%          | Available output: 390.625 XAUH; input cap: 50,000 USDT                                     |
-| Concentrated-liquidity AMM | Virtual reserves: 500,000; 3,906.25 | 0.30%          | Price range: 126–128.20 USDT/XAUH; available output: 3.048186 XAUH; input cap: 10,000 USDT |
+1. Select Instant buy or Instant sell, enter the exact input amount and choose slippage from 0 to 500 whole basis points. Each direction starts with a one-token preview amount. 50 basis points means 0.50%. Live quotes load without connecting a wallet, update 400 milliseconds after editing, and refresh every 15 seconds while the page is visible. Invalid amounts clear old results. Background pages and unresolved transactions pause refreshes.
+2. Use **Connect wallet** on either the strategy or Wallets screen to request access to an injected Ethereum wallet. Both screens share its address, network, live balances and connection state. Reconnect after reloading the app; switching screens retains the existing connection. If needed, explicitly choose **Switch to Sepolia**. Disconnecting clears this app’s connection and quotes while preserving transaction recovery; it does not revoke wallet permissions. The wallet needs input tokens and Sepolia ETH to execute, but insufficient funds do not prevent price previews.
+3. **Get live quotes** also refreshes manually. Both options are quoted at the same block for the same input: Constant-product AMM and Concentrated-liquidity AMM. Either is selectable. The highest net token receipt is highlighted; equal receipts are described as equivalent. Unavailable options show their own error and cannot execute.
+4. Approve the exact input amount with a separate wallet confirmation. Reset an existing nonzero allowance with a separate confirmed action before changing it. Reconcile the approval; quotes refresh automatically afterward.
+5. Choose **Buy XAUH** or **Sell XAUH**. The app refreshes balances, code fingerprints, token fees and allowances, simulates the selected call, estimates gas and asks the wallet to submit. The minimum net receipt and a deadline of 90 seconds from the quote block are encoded in taker traits. Quotes also expire locally.
+6. Use **Reconcile transaction** to verify two canonical block confirmations, the saved sender/nonce/calldata, swap and registry events, and actual ERC-20 transfer deltas. Two confirmations are not consensus finality.
 
-Both start at an internal pool price of 128 USDT/XAUH. This pool price is distinct from the shared external reference of 130. The concentrated offer's real output reserve is derived from the range: with `L = sqrt(X × Y)` and `P = X / Y`, the available XAUH is `L × (1 / sqrt(P) − 1 / sqrt(128.20))`, approximately 3.048186184 XAUH, rounded down to six decimals. The corresponding real USDT reserve is `L × (sqrt(P) − sqrt(126))`, approximately 3,921.629175 USDT. Virtual reserves are not spendable balances. Each offer's input cap is an independent illustrative offer limit, not a derivation of its reserves or range; the concentrated range and actual output balance impose a tighter limit first.
+Public quotes use the configured RPC and require no wallet permission or balance. Anonymous quotes cannot authorize approvals or swaps. Connecting or changing accounts invalidates earlier quotes; executable quotes must be bound to the connected account. Every write still rechecks wallet identity, chain, balances, allowance, simulation and deadline. Automatic refresh performs read-only RPC calls.
 
-For purchase amount `A`, swap fee `f` is rounded up and deducted inside `A`. Net input `a = A − f` gives `Q = Y × a / (X + a)`, with output rounded down. The concentrated offer uses its virtual reserves in this formula, and separately checks both endpoint prices and available real output. No offer silently reduces the requested amount.
+The recommendation compares token output after listed swap and transfer fees. Network fees are additional and estimated by the wallet, so the highlighted option is not a comparison of total costs including gas. No synthetic reference price or fixed payment fee is applied.
 
-A fixed payment fee of **0.38 USDT** is added on top: total `C = A + 0.38`. This is an explicit comparison fixture, consistent with the historical display value, not a verified Aqua tariff. The 0.05% and 0.30% swap fees are also illustrative. Network fees are unknown and **not included**, rather than assumed to be zero; there is no fee-on-transfer model. The UI's effective price includes only the listed swap and payment fees.
+### Token fees
 
-The [calculator](src/demo/execution.ts) checks the full total against per-purchase, remaining daily/monthly budgets, and the balance after the required reserve. Effective price is `C / Q`; price versus reference is `(effective USD price / reference price − 1) × 100%`. Target and markup comparisons use exact integer cross-products before display rounding. Negative markup remains negative. Among eligible offers, the largest XAUH output wins; equal six-decimal outputs use a stable offer ID and are described as equivalent.
+The Sepolia fee token exposes `FEE_RATE()` and `FEE_PARTS()`. Fees use integer division: `floor(amount × rate / parts)`, following XAUH's proportional transfer-fee model. Unsupported rates or missing fee methods block readiness.
 
-Amounts use integer arithmetic at six decimal places, a UI model precision rather than a claim about contract token decimals. Outputs round down, fees and calculated price bounds round up, and inputs with more than six decimals are rejected. Values above 1,000,000,000,000, invalid active-rule fields, zero output, or invalid comparison data cannot produce a recommendation. Inactive strategy fields do not affect the selected rule. Zero budgets and reserves are valid inputs; purchase/target values must be positive. DCA accepts full weekday names and 24-hour `HH:mm`; Dip buy requires a percentage strictly between 0 and 100 and a positive whole-day window.
+The configured fork's `quote()` and `Swapped` output represent the net receipt. The interface does not deduct transfer fees from this output again. For buys, XAUH moves from the maker to the buyer in one taxed transfer. Its displayed fee is estimated by reconstructing the gross output from the net quote. For sells, XAUH passes from the wallet to the router and then to the maker; both taxed transfers are shown separately, with the second fee calculated on the amount remaining after the first.
 
-At **50 USDT**, the offers yield 0.390039 and 0.389414 XAUH, respectively, so Constant-product AMM wins. At **200 USDT**, they yield 1.555499 and 1.557191 XAUH, so Concentrated-liquidity AMM wins. Both examples fit the initial target and shared limits. A **250 USDT** purchase is excluded by a 250 USDT purchase cap because the total is **250.38 USDT**. These examples demonstrate amount-dependent comparison, not a guarantee of future execution or returns.
+Fees are separate from any SwapVM input fee and ETH network fee. A successful receipt is checked against actual net transfers, including the maker's gross output debit and both sell-side deductions. Fee values can change before mining; minimum output and the deadline remain enforced by the submitted calldata.
 
-## Development
+### Transaction recovery
 
-[Application state](src/App.tsx) composes the [screens](src/screens/) and [shared components](src/components/). [Demo fixtures](src/demo/fixtures.ts) hold example data, [types](src/types.ts) define the model, and [styles](src/styles.css) contain the visual presentation. [Browser hooks](src/hooks/browser.ts) handle the system theme and visible viewport.
+The app persists a public transaction identity before opening the wallet: chain, sender, nonce, destination and calldata. An unresolved operation blocks further writes across app tabs using Web Locks. Rejection, mined revert, replacement and unexpected receipt evidence are distinct outcomes. There are no automatic financial retries, private-key signing or wallet credential storage.
 
-Installing dependencies enables a pre-commit hook that applies safe lint fixes and formats staged files. See the [contributor guide](CONTRIBUTING.md) for editor setup, workflow, and validation details.
+After reload, reconnect the submitting account and reconcile the pending operation. A hashless submission scans up to 40 mined blocks per action. Attach its transaction or replacement hash to locate it directly. A matching nonce with different calldata is a replacement, not a successful execution of the requested action. An absent receipt never authorizes resubmission. Resolve an unmined nonce in the wallet and reconcile its hash.
+
+Only public operations are persisted. Quotes, balances and wallet credentials are not saved. Existing recovery journals are not cleared when navigating, selecting another strategy or refreshing the app. Previously confirmed receipts are checked for canonical block identity before another write.
+
+## Development and validation
+
+[Application state](src/App.tsx) composes [screens](src/screens/) and [shared components](src/components/). Simulated data remains in [demo fixtures](src/demo/fixtures.ts). The [shared wallet provider](src/live/SwapContext.tsx) retains the session across screen navigation. The [quote scheduler](src/live/useSwapQuotes.ts) debounces inputs and pauses automatic reads when appropriate. The [strategy screen](src/screens/TradingStrategyScreen.tsx) owns the selector, while the [swap panel](src/components/AquaSwapPanel.tsx), [execution comparison](src/components/AquaExecution.tsx), [configuration parser](src/live/swapConfig.ts), [swap model](src/live/swapModel.ts) and [wallet session](src/live/swapSession.ts) implement the separate Sepolia flow.
+
+The SDKs are pinned to `@1inch/aqua-sdk` 0.3.0 and `@1inch/swap-vm-sdk` 0.4.0, with `viem` 2.57.13. Opcode numbers depend on the router version; ABI compatibility alone does not establish program compatibility. Runtime fingerprints must be reviewed when changing contracts. Vite resolves the SDK's `assert` dependency for browsers; Node-side SDK tests use CommonJS because of an extensionless ESM dependency import.
+
+```sh
+npx playwright install chromium
+npm run format
+npm run validate
+```
+
+Tests use synthetic deployments and browser wallets. They cover both pricing types and swap directions, separate token fees, finite approvals, stale quotes, context changes, receipt evidence and reload recovery. These checks do not establish a funded browser-wallet acceptance run. Use explicit wallet-confirmed swaps and reconcile their receipts for that verification.
+
+If local cache or output directories are unavailable, `VITE_CACHE_DIR` and `PLAYWRIGHT_OUTPUT_DIR` can select alternative locations. See the [contributor guide](CONTRIBUTING.md) for formatting and editor setup. Installing dependencies enables the existing lint-and-format pre-commit hook.
 
 ## Deployment
 
-GitHub Actions validates pull requests targeting `main` and pushes to `main`. Successful pushes in the upstream repository deploy the tested static build to the [Cloudflare Pages demo](https://herculis-xauh-agent-demo.pages.dev).
+GitHub Actions validates pull requests targeting `main` and pushes to `main`. Successful upstream pushes to `main` publish the validated static build. Publication requires separate authorization.
 
 ## License
 

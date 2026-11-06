@@ -1,4 +1,7 @@
+import { installSwapConfig } from "./swap-wallet.cjs";
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => installSwapConfig(page));
 
 for (const theme of ["light", "dark"]) {
   test(`${theme} Quantis information remains readable and scrollable at narrow widths and with enlarged text`, async ({
@@ -84,9 +87,9 @@ for (const theme of ["light", "dark"]) {
           await draw.click();
           await draw.click();
           await expect(page.getByRole("status", { name: "Random strategy result" })).toHaveText(
-            "Draw 2: Reserve buy. Selected again.",
+            "Draw 2: Instant buy. Selected again.",
           );
-          await expect(page.getByRole("radio", { name: "Reserve buy" })).toBeChecked();
+          await expect(page.getByRole("radio", { name: "Instant buy", exact: true })).toBeChecked();
         }
         await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", theme);
         const settings = page.getByRole("button", { name: "Open settings" });
@@ -208,7 +211,7 @@ test("system theme changes update both the app and open dialogs", async ({ page 
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.goto("/?tab=wallets");
   await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", "dark");
-  await page.getByTestId("connect-wallet").click();
+  await page.getByTestId("top-up-wallet").click();
   await expect(page.getByRole("dialog")).toHaveCSS("background-color", "rgb(17, 23, 34)");
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.getByTestId("app-shell")).toHaveAttribute("data-theme", "light");
@@ -224,7 +227,7 @@ test("clipboard failure reports the failure without claiming success", async ({ 
     });
   });
   await page.getByRole("button", { name: "Copy Ethereum agent wallet address" }).click();
-  await expect(page.getByRole("status")).toContainText("Could not copy the address");
+  await expect(page.getByTestId("toast")).toContainText("Could not copy the address");
 });
 
 test("demo interactions make no external requests", async ({ page }) => {
@@ -238,7 +241,7 @@ test("demo interactions make no external requests", async ({ page }) => {
     if (message.type() === "error") errors.push(message.text());
   });
   await page.goto("/?tab=wallets");
-  await page.getByTestId("connect-wallet").click();
+  await page.getByTestId("top-up-wallet").click();
   await page.getByTestId("verify-wallet").click();
   await page.getByTestId("top-up-wallet").click();
   await page.getByTestId("review-top-up").click();
@@ -265,9 +268,8 @@ test("demo interactions make no external requests", async ({ page }) => {
   await expect(page.getByText(/You can review your trading strategy/)).toBeVisible();
   await page.getByRole("button", { name: "Open trading strategy" }).click();
   await page.getByRole("button", { name: "Choose randomly with Quantis" }).click();
-  await page.getByRole("button", { name: "Save strategy" }).click();
-  await page.getByRole("button", { name: "Pause strategy" }).click();
-  await page.getByRole("button", { name: "Resume strategy" }).click();
+  await page.getByRole("radio", { name: "Instant sell", exact: true }).check();
+  await page.getByRole("radio", { name: "Instant buy", exact: true }).check();
   expect(externalRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
@@ -286,9 +288,11 @@ test("browser preview viewport mismatch does not truncate the full-page app", as
   expect(nav!.y + nav!.height).toBe(900);
 });
 
-test("Ethereum connection dialog supports keyboard navigation and dismissal", async ({ page }) => {
+test("demo wallet connection dialog supports keyboard navigation and dismissal", async ({
+  page,
+}) => {
   await page.goto("/?tab=wallets");
-  const trigger = page.getByRole("button", { name: "Connect Ethereum wallet" });
+  const trigger = page.getByTestId("top-up-wallet");
   await trigger.focus();
   await trigger.press("Enter");
   const dialog = page.getByRole("dialog");
@@ -312,7 +316,7 @@ for (const theme of ["light", "dark"]) {
     page,
   }) => {
     await page.goto(`/?tab=wallets&theme=${theme}`);
-    await page.getByTestId("connect-wallet").click();
+    await page.getByTestId("top-up-wallet").click();
     await page.getByTestId("verify-wallet").click();
     for (const width of [320, 375, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });

@@ -1,221 +1,145 @@
-import type { ExecutionComparison, ExecutionEstimate } from "../types";
-import { formatDecimal } from "../demo/executionDecimal";
+import { formatUnits } from "viem";
+import type { ExecutionFamily } from "../types";
+import { familyNames, type SwapDirection, type SwapToken } from "../live/swapConfig";
+import type { SwapEstimate } from "../live/swapModel";
 
-function Metrics({ estimate }: { estimate: ExecutionEstimate }) {
-  if (!estimate.quote) return null;
-  const { output, total, effectivePrice } = estimate.quote;
-  return (
-    <dl className="execution-metrics">
-      <div>
-        <dt>Estimated XAUH</dt>
-        <dd>
-          {formatDecimal(output, 6)} <small>XAUH</small>
-        </dd>
-      </div>
-      <div>
-        <dt>Total USDT</dt>
-        <dd>
-          {formatDecimal(total, 2)} <small>USDT</small>
-        </dd>
-      </div>
-      <div>
-        <dt>Effective price</dt>
-        <dd>
-          {formatDecimal(effectivePrice, 2, 2)} <small>USDT/XAUH</small>
-        </dd>
-      </div>
-    </dl>
+export function AquaExecution({
+  direction,
+  estimates,
+  decimals,
+  selected,
+  onSelect,
+  disabled,
+}: {
+  direction: SwapDirection;
+  estimates: SwapEstimate[];
+  decimals?: Record<SwapToken, number>;
+  selected: ExecutionFamily;
+  onSelect: (family: ExecutionFamily) => void;
+  disabled: boolean;
+}) {
+  const buying = direction === "instant-buy";
+  const quotes = estimates.flatMap((item) => (item.quote ? [item.quote] : []));
+  const best = quotes.reduce<bigint | undefined>(
+    (value, quote) => (value === undefined || quote.output > value ? quote.output : value),
+    undefined,
   );
-}
-
-function inputHint(field: string): string {
-  if (field === "Day") return "Enter a day from Monday to Sunday.";
-  if (field === "Local time") return "Use 24-hour time, from 00:00 to 23:59.";
-  if (field === "Drop from recent high")
-    return "Enter a percentage greater than 0 and less than 100.";
-  if (field === "Recent-high window") return "Enter a positive whole number of days.";
-  if (field === "Purchase amount" || field === "Buy at or below")
-    return "Enter a positive value with up to 6 decimal places.";
-  return "Enter zero or a positive value with up to 6 decimal places.";
-}
-
-export function AquaExecution({ comparison }: { comparison: ExecutionComparison }) {
-  const { recommendation, estimates, context } = comparison;
-  const eligibleCount = estimates.filter((estimate) => estimate.reasons.length === 0).length;
-  const reasons = [...new Set(estimates.flatMap((estimate) => estimate.reasons))];
-  const comparedQuote = estimates.find((estimate) => estimate.quote)?.quote;
-  const announcement = recommendation
-    ? `Recommended execution: ${recommendation.offer.name}`
-    : comparison.explanation;
-
+  const tied = quotes.length === 2 && quotes[0].output === quotes[1].output;
   return (
     <section className="execution-panel" aria-labelledby="execution-heading">
       <div className="execution-heading">
         <h3 id="execution-heading">Execution via Aqua</h3>
-        <span className="execution-pair">USDT → XAUH</span>
+        <span className="execution-pair">{buying ? "USDT → XAUH" : "XAUH → USDT"}</span>
       </div>
-      <p className="execution-help">Compared for one purchase when your rule is met.</p>
+      <p className="execution-help">
+        Choose either pricing type. The highest estimated net receipt is highlighted.
+      </p>
       <p
         className="visually-hidden"
         role="status"
         aria-label="Execution recommendation"
         aria-atomic="true"
       >
-        {announcement}
+        {best === undefined
+          ? "Enter an amount to compare live quotes."
+          : tied
+            ? "Both options have equivalent net output."
+            : `Best net receipt: ${familyNames[quotes.find((quote) => quote.output === best)!.order.family]}`}
       </p>
-      {comparison.status === "invalid" ? (
-        <div className="execution-empty">
-          <h4>{comparison.explanation}</h4>
-          <ul id="execution-input-errors">
-            {comparison.invalidFields.map((field) => (
-              <li key={field}>
-                <strong>{field}:</strong> {inputHint(field)}
-              </li>
-            ))}
-          </ul>
-          <p>Values must not exceed 1,000,000,000,000.</p>
-        </div>
-      ) : (
-        <>
-          <p className="execution-condition">{comparison.condition}</p>
-          {recommendation ? (
-            <section className="execution-recommendation" aria-label="Agent recommendation">
-              <p className="execution-kicker">Agent recommendation</p>
-              <h4>{recommendation.offer.name}</h4>
-              <Metrics estimate={recommendation} />
-              <p className="execution-reason">
-                <strong>Why this option</strong>
-                <span>{comparison.explanation}</span>
-              </p>
-            </section>
-          ) : (
-            <div className="execution-empty">
-              <h4>{comparison.explanation}</h4>
-              <ul>
-                {(reasons.length ? reasons : ["No execution options are available"]).map(
-                  (reason) => (
-                    <li key={reason}>{reason}</li>
-                  ),
-                )}
-              </ul>
-            </div>
-          )}
-          <details className="execution-disclosure">
-            <summary>Compare options ({estimates.length})</summary>
-            <p className="execution-help">
-              {eligibleCount} within your limits · Same purchase amount and reference conditions
-            </p>
-            <div className="execution-options">
-              {estimates.map((estimate) => {
-                const isRecommended = estimate.offer.id === recommendation?.offer.id;
-                const { quote, offer } = estimate;
-                const outputDifference =
-                  (recommendation?.quote?.output ?? 0n) - (quote?.output ?? 0n);
-                return (
-                  <article className="execution-option" key={offer.id} aria-label={offer.name}>
-                    <p className="execution-kicker">
-                      {estimate.reasons.length
-                        ? "Not eligible"
-                        : isRecommended
-                          ? "Recommended"
-                          : "Alternative"}
-                    </p>
-                    <h4>{offer.name}</h4>
-                    {estimate.reasons.length ? (
-                      <ul className="execution-rejections">
-                        {estimate.reasons.map((reason) => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
-                    ) : !isRecommended ? (
-                      <p className="execution-help">
-                        {outputDifference === 0n
-                          ? "Equivalent estimated output"
-                          : `${formatDecimal(outputDifference, 6)} XAUH less for the same total USDT.`}
-                      </p>
-                    ) : null}
-                    <Metrics estimate={estimate} />
-                    <dl className="execution-details">
-                      <div>
-                        <dt>Swap fee</dt>
-                        <dd>
-                          {quote ? `${formatDecimal(quote.swapFee)} USDT · ` : ""}
-                          {formatDecimal(offer.feePpm * 100n)}% of purchase amount
-                        </dd>
+      <div className="execution-options" role="radiogroup" aria-label="Aqua execution strategy">
+        {(["constant-product", "concentrated-liquidity"] as const).map((family) => {
+          const estimate = estimates.find((item) => item.family === family),
+            quote = estimate?.quote;
+          const recommended = quote && quote.output === best;
+          return (
+            <article
+              className={`execution-option${selected === family ? " is-selected" : ""}${recommended ? " is-recommended" : ""}`}
+              key={family}
+              aria-label={familyNames[family]}
+            >
+              <label className="execution-choice">
+                <input
+                  type="radio"
+                  name="aqua-execution"
+                  aria-label={familyNames[family]}
+                  checked={selected === family}
+                  onChange={() => onSelect(family)}
+                  disabled={disabled}
+                />
+                <span>
+                  <strong>{familyNames[family]}</strong>
+                  <small>
+                    {recommended
+                      ? tied
+                        ? "Equivalent net output"
+                        : "Best net receipt"
+                      : family === "constant-product"
+                        ? "Full-range liquidity"
+                        : "Liquidity within a price range"}
+                  </small>
+                </span>
+                {selected === family && <em>Selected</em>}
+              </label>
+              {quote && decimals ? (
+                <>
+                  <dl className="execution-metrics">
+                    <div>
+                      <dt>Estimated received</dt>
+                      <dd>
+                        {formatUnits(quote.output, decimals[buying ? "xauh" : "usdt"])}{" "}
+                        <small>{buying ? "XAUH" : "USDT"}</small>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>You pay</dt>
+                      <dd>
+                        {formatUnits(quote.input, decimals[buying ? "usdt" : "xauh"])}{" "}
+                        <small>{buying ? "USDT" : "XAUH"}</small>
+                      </dd>
+                    </div>
+                  </dl>
+                  <dl className="execution-details">
+                    <div>
+                      <dt>Swap fee</dt>
+                      <dd>
+                        {formatUnits(quote.swapFee, decimals[buying ? "usdt" : "xauh"])}{" "}
+                        {buying ? "USDT" : "XAUH"} · included in input
+                      </dd>
+                    </div>
+                    {quote.transferFees.map((fee, index) => (
+                      <div key={index}>
+                        <dt>
+                          {buying
+                            ? "XAUH transfer fee"
+                            : index === 0
+                              ? "XAUH transfer fee · to router"
+                              : "XAUH transfer fee · to liquidity provider"}
+                        </dt>
+                        <dd>{formatUnits(fee, decimals.xauh)} XAUH</dd>
                       </div>
-                      {quote ? (
-                        <div>
-                          <dt>Price vs reference</dt>
-                          <dd>
-                            {quote.priceVsReference > 0n ? "+" : ""}
-                            {formatDecimal(quote.priceVsReference, 2, 2)}%
-                          </dd>
-                        </div>
-                      ) : null}
-                      {offer.priceRange ? (
-                        <div>
-                          <dt>Price range</dt>
-                          <dd>
-                            {formatDecimal(offer.priceRange.min)}–
-                            {formatDecimal(offer.priceRange.max)} USDT/XAUH
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  </article>
-                );
-              })}
-            </div>
-            <details className="execution-disclosure execution-comparison-details">
-              <summary>Comparison details</summary>
-              <dl className="execution-details">
-                {comparedQuote ? (
-                  <div>
-                    <dt>Purchase amount</dt>
-                    <dd>{formatDecimal(comparedQuote.amount)} USDT</dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt>Payment fee</dt>
-                  <dd>{formatDecimal(context.paymentFee)} USDT, added to purchase amount</dd>
-                </div>
-                <div>
-                  <dt>Reference price</dt>
-                  <dd>{formatDecimal(context.referencePrice)} USD/XAUH</dd>
-                </div>
-                <div>
-                  <dt>USDT conversion</dt>
-                  <dd>1 USDT = {formatDecimal(context.usdPerUsdt)} USD</dd>
-                </div>
-                <div>
-                  <dt>Network</dt>
-                  <dd>Ethereum</dd>
-                </div>
-                <div>
-                  <dt>Network fee</dt>
-                  <dd>Not included</dd>
-                </div>
-                <div>
-                  <dt>Balance for comparison</dt>
-                  <dd>{formatDecimal(context.balance, 2)} USDT</dd>
-                </div>
-                <div>
-                  <dt>Spent today</dt>
-                  <dd>{formatDecimal(context.spentToday)} USDT</dd>
-                </div>
-                <div>
-                  <dt>Spent this month</dt>
-                  <dd>{formatDecimal(context.spentThisMonth)} USDT</dd>
-                </div>
-              </dl>
-              <p className="execution-help">
-                Swap fees are included in the purchase amount. Total USDT includes the payment fee.
-                Effective price uses these listed fees.
-              </p>
-            </details>
-          </details>
-        </>
-      )}
+                    ))}
+                    <div>
+                      <dt>Minimum received</dt>
+                      <dd>
+                        {formatUnits(quote.minimum, decimals[buying ? "xauh" : "usdt"])}{" "}
+                        {buying ? "XAUH" : "USDT"}
+                      </dd>
+                    </div>
+                  </dl>
+                </>
+              ) : (
+                <p className={estimate?.error ? "execution-rejections" : "execution-help"}>
+                  {estimate?.error ?? "Waiting for a live quote."}
+                </p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      <p className="execution-help">
+        Received amounts already include token transfer fees. XAUH fee estimates use the token’s
+        current rate and integer rounding. Network fees are additional and estimated by your wallet.
+      </p>
     </section>
   );
 }

@@ -3,7 +3,7 @@
 Read the [README](README.md) and [contributor guide](CONTRIBUTING.md) before editing.
 
 - Preserve the full-page responsive layout, native scrolling, and native inputs.
-- Keep all wallet, transaction, chat, and account behavior simulated.
+- Keep demo wallet, transaction, chat and account behavior simulated. Isolate the Live Aqua PoC from demo state and require explicit user actions with browser wallet confirmation for every financial write.
 - Separate screens, shared components, demo fixtures, and types.
 - Preserve accessible dialogs, theme contrast, and browser safe-area handling.
 - Keep project source free of comments, personal data, task references, and internal infrastructure details. Preserve required third-party notices.
