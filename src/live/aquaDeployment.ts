@@ -1,11 +1,11 @@
 export default {
   chainId: 11155111,
   deploymentBlock: "12061729",
-  router: "0x286658A30E2c14a99663D31Cb4b2E77E63867428",
-  registry: "0xAdE83D979E11fAC08bc09417e0911651F990bf36",
+  router: "0x36A2C38a90586522Cc52B3169737b3C4d23d97ff",
+  registry: "0xA7B322687E5a4C5feAEA9098B5e0ebA4F3f7BcE4",
   tokens: {
-    xauh: "0xF1aA35a91BF2B18dABcc1bac2998AeDfCd5b46bB",
-    usdt: "0x2Dcd3c0990456c6BC975FFfaD0C8BA35E1103EdA",
+    xauh: "0xB2D939C1995FcaaC8f65dF39fBBdC9B359d7225C",
+    usdt: "0x8F8Ce81c721f79CE7da5b0b18acEa947fF7D85A4",
   },
   codeHashes: {
     router: "0x9d80ecaf1daeb61d0a6664ab86e828109d3535c6d59ecaa0e390068564fbb674",
