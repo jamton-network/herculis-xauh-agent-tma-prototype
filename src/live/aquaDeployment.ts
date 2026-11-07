@@ -8,7 +8,7 @@ export default {
     usdt: "0x8F8Ce81c721f79CE7da5b0b18acEa947fF7D85A4",
   },
   codeHashes: {
-    router: "0x9d80ecaf1daeb61d0a6664ab86e828109d3535c6d59ecaa0e390068564fbb674",
+    router: "0xca1848461d2bd665f4ae3e9c142df48d68128125c4f9705ac28c4957dbb0d8d1",
     registry: "0x567cfad5d28da80ddaad39021332d0685e9733b3f1683933220e6ab61bd64205",
     xauh: "0x8bb6709aef0e9368e0ed60266eac571cb6a419f3a267620f8581ce7b872185eb",
     usdt: "0x29db96d2b51ec5bdffbf3107eaf76101e8dbb6e10c4acfdff177eb1ddd421ba4",
